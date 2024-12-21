@@ -2,7 +2,7 @@
 /**
  * index.ts
  *
- * Use stdio MCP servers over SSE with one command
+ * Run stdio MCP servers over SSE
  *
  * Usage:
  *   npx -y supergateway --port 8000 \
@@ -37,7 +37,8 @@ async function main() {
   const STDIO_CMD = argv.stdio
 
   console.log('[supergateway] Starting...')
-  console.log(`[supergateway]  - Port: ${PORT}`)
+  console.log('[supergateway] Supergateway is supported by Superinterface - https://superinterface.ai')
+  console.log(`[supergateway]  - port: ${PORT}`)
   console.log(`[supergateway]  - stdio: ${STDIO_CMD}`)
 
   // 1. Spawn the child MCP server
@@ -48,7 +49,7 @@ async function main() {
 
   // 2. Create a simple MCP Server that forwards messages to/from the child
   const server = new Server(
-    { name: 'stdio-bridge', version: '1.0.0' },
+    { name: 'supergateway', version: '1.0.0' },
     { capabilities: {} }
   )
 
