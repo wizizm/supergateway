@@ -1,6 +1,6 @@
 {
   "name": "supergateway",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Run stdio MCP servers over SSE.",
   "type": "module",
   "bin": {
