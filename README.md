@@ -9,8 +9,7 @@ Supported by [superinterface.ai](https://superinterface.ai) and [supercorp.ai](h
 Run Supergateway via `npx`:
 
 ```bash
-npx -y supergateway --port 8000 \
-    --stdio "npx -y @modelcontextprotocol/server-filesystem /Users/MyName/Desktop"
+npx -y supergateway --stdio "uvx mcp-server-git"
 ```
 
 - **`--port 8000`**: Port to listen on (default: `8000`)
