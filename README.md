@@ -56,4 +56,4 @@ Issues and PRs are welcome. Please open one if you have ideas or encounter any p
 
 ## License
 
-[MIT License](./LICENSE.md)
+[MIT License](./LICENSE)
