@@ -1,5 +1,3 @@
-# Supergateway
-
 ![Supergateway: Run stdio MCP servers over SSE](./supergateway.png)
 
 **Supergateway** runs a **stdio-based MCP server** over **SSE (Server-Sent Events)** with one command. This is useful for remote access, debugging, or connecting to SSE-based clients when your MCP server only speaks stdio.
@@ -35,9 +33,9 @@ Once started:
    ```
    You can then read resources, list tools, or run other MCP actions through Supergateway.
 
-## Sharing Locally (Testing Only)
+## Using with ngrok
 
-For quick demos, you can use [ngrok](https://ngrok.com/) to share your local setup:
+You can use [ngrok](https://ngrok.com/) to share your local MCP server with remote clients:
 
 ```bash
 npx -y supergateway --port 8000 \
@@ -46,7 +44,7 @@ npx -y supergateway --port 8000 \
 ngrok http 8000
 ```
 
-ngrok provides a public URL for testing. In production, run Supergateway on your own server without ngrok.
+ngrok then provides a public URL.
 
 ## Why MCP?
 
