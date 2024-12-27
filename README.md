@@ -1,6 +1,6 @@
 ![Supergateway: Run stdio MCP servers over SSE](https://raw.githubusercontent.com/supercorp-ai/supergateway/main/supergateway.png)
 
-**Supergateway** runs a **stdio-based MCP server** over **SSE (Server-Sent Events)** with one command. This is useful for remote access, debugging, or connecting to SSE-based clients when your MCP server only speaks stdio.
+**Supergateway** runs a **MCP stdio-based servers** over **SSE (Server-Sent Events)** with one command. This is useful for remote access, debugging, or connecting to SSE-based clients when your MCP server only speaks stdio.
 
 Supported by [superinterface.ai](https://superinterface.ai) and [supercorp.ai](https://supercorp.ai).
 

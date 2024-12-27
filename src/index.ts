@@ -2,11 +2,10 @@
 /**
  * index.ts
  *
- * Run stdio MCP servers over SSE
+ * Run MCP stdio servers over SSE
  *
  * Usage:
- *   npx -y supergateway --port 8000 \
- *       --stdio "npx -y @modelcontextprotocol/server-filesystem /some/folder"
+ *   npx -y supergateway --port 8000 --stdio "npx -y @modelcontextprotocol/server-filesystem /some/folder"
  */
 
 import express from 'express'
@@ -41,13 +40,13 @@ async function main() {
   console.log(`[supergateway]  - port: ${PORT}`)
   console.log(`[supergateway]  - stdio: ${STDIO_CMD}`)
 
-  // 1. Spawn the child MCP server
   const child: ChildProcessWithoutNullStreams = spawn(STDIO_CMD, { shell: true })
+
   child.on('exit', (code, signal) => {
     console.error(`[supergateway] Child process exited with code=${code}, signal=${signal}`)
+    process.exit(code ?? 1)
   })
 
-  // 2. Create a simple MCP Server that forwards messages to/from the child
   const server = new Server(
     { name: 'supergateway', version: '1.0.0' },
     { capabilities: {} }
@@ -55,10 +54,8 @@ async function main() {
 
   let sseTransport: SSEServerTransport | undefined
 
-  // 3. Set up Express
   const app = express()
 
-  // Skip bodyParser for /message
   app.use((req, res, next) => {
     if (req.path === '/message') {
       return next()
@@ -66,13 +63,11 @@ async function main() {
     return bodyParser.json()(req, res, next)
   })
 
-  // GET /sse => SSE endpoint
   app.get('/sse', async (req, res) => {
     console.log(`[supergateway] New SSE connection from ${req.ip}`)
     sseTransport = new SSEServerTransport('/message', res)
     await server.connect(sseTransport)
 
-    // SSE -> Child
     sseTransport.onmessage = (msg: JSONRPCMessage) => {
       const line = JSON.stringify(msg)
       console.log('[supergateway] SSE -> Child:', line)
@@ -88,7 +83,6 @@ async function main() {
     }
   })
 
-  // POST /message => handle JSON-RPC from SSE
   app.post('/message', async (req, res) => {
     if (sseTransport?.handlePostMessage) {
       console.log('[supergateway] POST /message -> SSE transport')
@@ -98,7 +92,6 @@ async function main() {
     }
   })
 
-  // 4. Child -> SSE
   child.stdout.on('data', (chunk: Buffer) => {
     const text = chunk.toString('utf8')
     for (const line of text.split(/\r?\n/g)) {
@@ -118,7 +111,6 @@ async function main() {
     console.error('[supergateway] [child stderr]', text)
   })
 
-  // 5. Listen
   app.listen(PORT, () => {
     console.log(`[supergateway] Listening on port ${PORT}`)
     console.log(`  SSE endpoint:   http://localhost:${PORT}/sse`)
