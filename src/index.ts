@@ -92,9 +92,16 @@ async function main() {
     }
   })
 
+  let buffer = ''
+
   child.stdout.on('data', (chunk: Buffer) => {
-    const text = chunk.toString('utf8')
-    for (const line of text.split(/\r?\n/g)) {
+    buffer += chunk.toString('utf8')
+
+    let lines = buffer.split(/\r?\n/)
+
+    buffer = lines.pop() ?? ''
+
+    for (const line of lines) {
       if (!line.trim()) continue
       try {
         const jsonMsg = JSON.parse(line)
