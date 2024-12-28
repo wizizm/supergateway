@@ -29,16 +29,26 @@ async function main() {
       demandOption: true,
       description: 'Command that runs an MCP server over stdio'
     })
+    .option('baseUrl', {
+      type: 'string',
+      default: '',
+      description: 'Base URL for the server'
+    })
     .help()
     .parseSync()
 
   const PORT = argv.port
   const STDIO_CMD = argv.stdio
+  const BASE_URL = argv.baseUrl
 
   console.log('[supergateway] Starting...')
   console.log('[supergateway] Supergateway is supported by Superinterface - https://superinterface.ai')
   console.log(`[supergateway]  - port: ${PORT}`)
   console.log(`[supergateway]  - stdio: ${STDIO_CMD}`)
+
+  if (BASE_URL) {
+    console.log(`[supergateway]  - baseUrl: ${BASE_URL}`)
+  }
 
   const child: ChildProcessWithoutNullStreams = spawn(STDIO_CMD, { shell: true })
 
@@ -60,17 +70,14 @@ async function main() {
     if (req.path === '/message') {
       return next()
     }
+
     return bodyParser.json()(req, res, next)
   })
 
   app.get('/sse', async (req, res) => {
-    console.log(`[supergateway] New SSE connection from ${req.ip} on ${req.originalUrl}`)
+    console.log(`[supergateway] New SSE connection from ${req.ip}`)
 
-    const originalUrl = req.originalUrl
-    const basePath = originalUrl.replace(/\/sse$/, '')
-    const messagePath = `${basePath}/message`
-
-    sseTransport = new SSEServerTransport(messagePath, res)
+    sseTransport = new SSEServerTransport(`${BASE_URL}/message`, res)
     await server.connect(sseTransport)
 
     sseTransport.onmessage = (msg: JSONRPCMessage) => {
