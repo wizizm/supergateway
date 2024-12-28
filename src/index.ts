@@ -64,8 +64,13 @@ async function main() {
   })
 
   app.get('/sse', async (req, res) => {
-    console.log(`[supergateway] New SSE connection from ${req.ip}`)
-    sseTransport = new SSEServerTransport('/message', res)
+    console.log(`[supergateway] New SSE connection from ${req.ip} on ${req.originalUrl}`)
+
+    const originalUrl = req.originalUrl
+    const basePath = originalUrl.replace(/\/sse$/, '')
+    const messagePath = `${basePath}/message`
+
+    sseTransport = new SSEServerTransport(messagePath, res)
     await server.connect(sseTransport)
 
     sseTransport.onmessage = (msg: JSONRPCMessage) => {
