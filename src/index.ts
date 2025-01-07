@@ -127,7 +127,7 @@ async function main() {
 
   child.stderr.on('data', (chunk: Buffer) => {
     const text = chunk.toString('utf8')
-    console.error('[supergateway] [child stderr]', text)
+    console.log('[supergateway] [child stderr]', text)
   })
 
   app.listen(PORT, () => {
