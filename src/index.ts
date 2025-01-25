@@ -34,12 +34,24 @@ async function main() {
       default: '',
       description: 'Base URL for the server'
     })
+    .option('ssePath', {
+      type: 'string',
+      default: '/sse',
+      description: 'Path for the SSE connection endpoint (default: /sse)'
+    })
+    .option('messagePath', {
+      type: 'string',
+      default: '/message',
+      description: 'Path for the message broadcast endpoint (default: /message)'
+    })
     .help()
     .parseSync()
 
   const PORT = argv.port
   const STDIO_CMD = argv.stdio
   const BASE_URL = argv.baseUrl
+  const SSE_PATH = argv.ssePath
+  const MESSAGE_PATH = argv.messagePath
 
   console.log('[supergateway] Starting...')
   console.log('[supergateway] Supergateway is supported by Superinterface - https://superinterface.ai')
@@ -49,6 +61,9 @@ async function main() {
   if (BASE_URL) {
     console.log(`[supergateway]  - baseUrl: ${BASE_URL}`)
   }
+
+  console.log(`[supergateway]  - ssePath: ${SSE_PATH}`)
+  console.log(`[supergateway]  - messagePath: ${MESSAGE_PATH}`)
 
   const child: ChildProcessWithoutNullStreams = spawn(STDIO_CMD, { shell: true })
 
@@ -67,17 +82,17 @@ async function main() {
   const app = express()
 
   app.use((req, res, next) => {
-    if (req.path === '/message') {
+    if (req.path === MESSAGE_PATH) {
       return next()
     }
 
     return bodyParser.json()(req, res, next)
   })
 
-  app.get('/sse', async (req, res) => {
-    console.log(`[supergateway] New SSE connection from ${req.ip}`)
+  app.get(SSE_PATH, async (req, res) => {
+    console.log(`[supergateway] New SSE connection on ${SSE_PATH} from ${req.ip}`)
 
-    sseTransport = new SSEServerTransport(`${BASE_URL}/message`, res)
+    sseTransport = new SSEServerTransport(`${BASE_URL}${MESSAGE_PATH}`, res)
     await server.connect(sseTransport)
 
     sseTransport.onmessage = (msg: JSONRPCMessage) => {
@@ -95,9 +110,9 @@ async function main() {
     }
   })
 
-  app.post('/message', async (req, res) => {
+  app.post(MESSAGE_PATH, async (req, res) => {
     if (sseTransport?.handlePostMessage) {
-      console.log('[supergateway] POST /message -> SSE transport')
+      console.log(`[supergateway] POST ${MESSAGE_PATH} -> SSE transport`)
       await sseTransport.handlePostMessage(req, res)
     } else {
       res.status(503).send('No SSE connection active')
@@ -132,8 +147,8 @@ async function main() {
 
   app.listen(PORT, () => {
     console.log(`[supergateway] Listening on port ${PORT}`)
-    console.log(`  SSE endpoint:   http://localhost:${PORT}/sse`)
-    console.log(`  POST messages:  http://localhost:${PORT}/message`)
+    console.log(`  SSE endpoint:   http://localhost:${PORT}${SSE_PATH}`)
+    console.log(`  POST messages:  http://localhost:${PORT}${MESSAGE_PATH}`)
   })
 }
 

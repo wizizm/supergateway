@@ -1,6 +1,6 @@
 {
   "name": "supergateway",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Run MCP stdio servers over SSE",
   "repository": "github:supercorp-ai/supergateway",
   "keywords": [
