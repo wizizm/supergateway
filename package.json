@@ -1,7 +1,7 @@
 {
   "name": "supergateway",
   "version": "1.5.0",
-  "description": "Run MCP stdio servers over SSE",
+  "description": "Run MCP stdio servers over SSE or visa versa",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/supercorp-ai/supergateway.git"
@@ -10,7 +10,9 @@
     "mcp",
     "stdio",
     "sse",
-    "gateway"
+    "gateway",
+    "proxy",
+    "bridge"
   ],
   "type": "module",
   "bin": {
