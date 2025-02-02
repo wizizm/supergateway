@@ -2,7 +2,7 @@
 /**
  * index.ts
  *
- * Run MCP stdio servers over SSE or SSE over stdio
+ * Run MCP stdio servers over SSE or visa versa
  *
  * Usage:
  *   # stdio -> SSE
@@ -10,7 +10,7 @@
  *                       --port 8000 --baseUrl http://localhost:8000 --ssePath /sse --messagePath /message
  *
  *   # SSE -> stdio
- *   npx -y supergateway --sse "https://mcp-server-123.supermachine.app"
+ *   npx -y supergateway --sse "https://mcp-server.superinterface.app"
  */
 
 import express from 'express'

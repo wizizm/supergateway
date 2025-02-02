@@ -13,11 +13,25 @@ npx -y supergateway --stdio "uvx mcp-server-git"
 ```
 
 - **`--port 8000`**: Port to listen on (default: `8000`)
-- **`--stdio`**: Command that runs an MCP server over stdio
+- **`--stdio "command"`**: Command that runs an MCP server over stdio
+- **`--baseUrl "http://localhost:8000"`**: Base URL for SSE clients (stdio to SSE mode; optional)
+- **`--ssePath "/sse"`**: Path for SSE subscriptions (stdio to SSE mode; default: `/sse`)
+- **`--messagePath "/message"`**: Path for SSE messages (stdio to SSE mode; default: `/message`)
+- **`--sse "url"`**: SSE URL to connect to
 
-Once started:
+Once started on SSE:
 - **SSE endpoint**: `GET http://localhost:8000/sse`
 - **POST messages**: `POST http://localhost:8000/message`
+
+## SSE to Stdio Mode
+
+Supergateway also supports running in **SSE to Stdio** mode. Instead of providing a `--stdio` command, specify the `--sse` flag with an SSE URL. In this mode, Supergateway connects to the remote SSE server and exposes a local stdio interface for downstream clients.
+
+Example:
+
+```bash
+npx -y supergateway --sse "https://mcp-server-example.superinterface.app"
+```
 
 ## Example with MCP Inspector
 
@@ -48,6 +62,13 @@ ngrok then provides a public URL.
 ## Why MCP?
 
 [Model Context Protocol](https://spec.modelcontextprotocol.io/) standardizes how AI tools exchange data. If your MCP server only speaks stdio, Supergateway exposes an SSE-based interface so remote clients (and tools like MCP Inspector) can connect without extra server changes.
+
+## Advanced Configuration
+
+Supergateway is designed with modularity in mind:
+- It automatically derives the JSON‑RPC version from incoming requests, ensuring future compatibility.
+- Package information (name and version) is retransmitted where possible.
+- Stdio-to-SSE mode uses standard logs and SSE-to-Stdio mode logs via stderr (as otherwise it would prevent stdio functionality).
 
 ## Contributing
 
