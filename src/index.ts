@@ -178,32 +178,43 @@ const sseToStdio = async (sseUrl: string) => {
     const isRequest = 'method' in message && 'id' in message
     if (isRequest) {
       logStderr('Stdio → SSE:', message)
+      const req = message as JSONRPCRequest
+      let result
       try {
-        const req = message as JSONRPCRequest
-        const result = await sseClient.request(req, z.any())
-        const response = wrapResponse(
-          req,
-          result.hasOwnProperty('error')
-            ? { error: { ...result.error } }
-            : { result: { ...result } }
-        )
-        logStderr('Response:', response)
-        process.stdout.write(JSON.stringify(response) + '\n')
-      }
-      catch (err) {
+        result = await sseClient.request(req, z.any())
+      } catch (err) {
         logStderr('Request error:', err)
-        const req = message as JSONRPCRequest
+        const errorCode =
+          err && typeof err === 'object' && 'code' in err
+            ? (err as any).code
+            : -32000
+        let errorMsg =
+          err && typeof err === 'object' && 'message' in err
+            ? (err as any).message
+            : 'Internal error'
+        // Remove the prefix if it is already present.
+        const prefix = `MCP error ${errorCode}:`
+        if (errorMsg.startsWith(prefix)) {
+          errorMsg = errorMsg.slice(prefix.length).trim()
+        }
         const errorResp = wrapResponse(req, {
           error: {
-            code: -32000,
-            message: 'Internal error',
-            data: err instanceof Error ? err.message : String(err),
+            code: errorCode,
+            message: errorMsg,
           },
         })
         process.stdout.write(JSON.stringify(errorResp) + '\n')
+        return
       }
-    }
-    else {
+      const response = wrapResponse(
+        req,
+        result.hasOwnProperty('error')
+          ? { error: { ...result.error } }
+          : { result: { ...result } }
+      )
+      logStderr('Response:', response)
+      process.stdout.write(JSON.stringify(response) + '\n')
+    } else {
       logStderr('SSE → Stdio:', message)
       process.stdout.write(JSON.stringify(message) + '\n')
     }
