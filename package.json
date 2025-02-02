@@ -1,7 +1,7 @@
 {
   "name": "supergateway",
   "version": "1.5.0",
-  "description": "Run MCP stdio servers over SSE",
+  "description": "Run MCP stdio servers over SSE or visa versa",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/supercorp-ai/supergateway.git"
@@ -10,7 +10,9 @@
     "mcp",
     "stdio",
     "sse",
-    "gateway"
+    "gateway",
+    "proxy",
+    "bridge"
   ],
   "type": "module",
   "bin": {
@@ -21,18 +23,18 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "latest",
-    "body-parser": "^1.20.2",
-    "express": "^4.18.2",
+    "@modelcontextprotocol/sdk": "^1.4.1",
+    "body-parser": "^1.20.3",
+    "express": "^4.21.2",
     "yargs": "^17.7.2"
   },
   "devDependencies": {
-    "@types/body-parser": "^1.19.2",
-    "@types/express": "^4.17.16",
-    "@types/node": "^20.5.9",
+    "@types/body-parser": "^1.19.5",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.13.0",
     "@types/yargs": "^17.0.33",
-    "ts-node": "^10.9.1",
-    "tsx": "^3.12.7",
-    "typescript": "^5.2.2"
+    "ts-node": "^10.9.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
   }
 }
