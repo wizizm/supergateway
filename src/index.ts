@@ -2,14 +2,14 @@
 /**
  * index.ts
  *
- * Run MCP stdio servers over SSE or SSE→stdio with local fallback handlers.
+ * Run MCP stdio servers over SSE or SSE over stdio
  *
  * Usage:
  *   # stdio -> SSE
  *   npx -y supergateway --stdio "npx -y @modelcontextprotocol/server-filesystem /some/folder" \
  *                       --port 8000 --baseUrl http://localhost:8000 --ssePath /sse --messagePath /message
  *
- *   # sse -> stdio (local server with fallback to remote SSE)
+ *   # sse -> stdio (local server with fallback to SSE)
  *   npx -y supergateway --sse "https://some-url"
  */
 
@@ -19,7 +19,6 @@ import { spawn, ChildProcessWithoutNullStreams } from 'child_process'
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 import { z } from 'zod'
-
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js'
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js'
@@ -27,23 +26,17 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import {
   JSONRPCMessage,
   JSONRPCRequest,
-  Request,
-  ListPromptsRequestSchema,
-  GetPromptRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 
-// --------------------------------------------------
-// 1) stdio → SSE mode
-// --------------------------------------------------
-async function runStdioToSseGateway(
+async function stdioToSse(
   stdioCmd: string,
   port: number,
   baseUrl: string,
   ssePath: string,
   messagePath: string
 ) {
-  console.log('[supergateway] Mode: stdio → SSE')
+  console.log('[supergateway] Mode: stdio to SSE')
   console.log(`[supergateway]  - stdio command: ${stdioCmd}`)
   console.log(`[supergateway]  - port: ${port}`)
   console.log(`[supergateway]  - baseUrl: ${baseUrl}`)
@@ -136,17 +129,16 @@ async function runStdioToSseGateway(
   })
 }
 
-async function runSseToStdioGateway(sseUrl: string) {
+async function sseToStdio(sseUrl: string) {
   // Use process.stderr for logs to avoid interfering with stdio communication
   const log = (...args: any[]) => console.error('[supergateway]', ...args)
 
-  log('Mode: SSE → stdio')
-  log(`Remote SSE URL: ${sseUrl}`)
-  log('Connecting to remote SSE...')
+  log('Mode: SSE to stdio')
+  log(`SSE URL: ${sseUrl}`)
+  log('Connecting to SSE...')
 
-  // Set up SSE client
   const sseTransport = new SSEClientTransport(new URL(sseUrl))
-  const remoteClient = new Client(
+  const sseClient = new Client(
     { name: 'supergateway', version: '1.0.0' },
     { capabilities: {} }
   )
@@ -154,52 +146,38 @@ async function runSseToStdioGateway(sseUrl: string) {
   sseTransport.onerror = err => {
     log('SSE client transport error:', err)
   }
+
   sseTransport.onclose = () => {
     log('SSE connection closed.')
     process.exit(1)
   }
 
-  // Connect to remote SSE
-  await remoteClient.connect(sseTransport)
-  log('Remote SSE is connected.')
+  await sseClient.connect(sseTransport)
+  log('SSE is connected.')
 
-  const localServer = new Server(
-    { name: 'supergateway', version: '1.0.0' },
-    { capabilities: remoteClient.getServerCapabilities() }
+  const stdioServer = new Server(
+    sseClient.getServerVersion() ?? { name: 'supergateway', version: '1.0.0' },
+    { capabilities: sseClient.getServerCapabilities() }
   )
 
-  // Connect local server to stdio
-  const localStdioTransport = new StdioServerTransport()
+  const stdioTransport = new StdioServerTransport()
+  await stdioServer.connect(stdioTransport)
 
-  await localServer.connect(localStdioTransport)
-  const passthroughSchema = z.any();
+  stdioServer.transport!.onmessage = async (message: JSONRPCMessage) => {
+    const isRequest = ('method' in message) && ('id' in message);
 
-  localServer.transport!.onmessage = async (msg: JSONRPCMessage) => {
-    // Check if the message looks like a request (has a "method" property)
-     const isRequest = ('method' in msg) && ('id' in msg);
     if (isRequest) {
-    // if ((msg as JSONRPCRequest).method) {
-      log('Forwarding stdio request to remote SSE:', msg);
+      log('Forwarding stdio request to SSE:', message);
       try {
-        const req = msg as JSONRPCRequest;
-        // Request the remote server with a passthrough schema.
-        // const jsonRpcRequest = {
-        //   jsonrpc: "2.0",
-        //   id: req.id,
-        //   method: req.method,
-        //   params: req.params || {}
-        // }
-        log('before', req)
-        const a = await remoteClient.request(req, passthroughSchema);
-        log('after', a)
-        log('Received response from remote SSE:', a);
+        const req = message as JSONRPCRequest;
+        const result = await sseClient.request(req, z.any())
+        log('Received result from SSE:', result)
 
-        // Now, determine if the remote response contains an error.
-        // (For example, if the remote server returned an error response, it might have an "error" key.)
         let wrappedResponse: JSONRPCMessage;
-        if (a && typeof a === 'object' && 'error' in a) {
+
+        if (result && typeof result === 'object' && 'error' in result) {
           // Reconstruct a proper JSON‑RPC error envelope.
-          const remoteError = a.error as { code: number; message: string; data?: any };
+          const remoteError = result.error as { code: number; message: string; data?: any };
           wrappedResponse = {
             jsonrpc: '2.0',
             id: req.id,
@@ -210,53 +188,38 @@ async function runSseToStdioGateway(sseUrl: string) {
             }
           };
         } else {
-          // Otherwise, wrap the result normally.
           wrappedResponse = {
             jsonrpc: '2.0',
             id: req.id,
-            result: a
-          };
+            result,
+          }
         }
-        log('Wrapped response:', wrappedResponse);
-        process.stdout.write(JSON.stringify(wrappedResponse) + '\n');
+        log('Wrapped response:', wrappedResponse)
+        process.stdout.write(JSON.stringify(wrappedResponse) + '\n')
       } catch (err) {
-        // Do not simply hide errors. Let them propagate in a controlled JSON‑RPC error envelope.
-        log('Error forwarding request:', err);
+        log('Error forwarding request:', err)
+
         const errorResponse = {
           jsonrpc: '2.0',
-          id: (msg as JSONRPCRequest).id,
+          id: (message as JSONRPCRequest).id,
           error: {
             code: -32000,
             message: 'Internal error',
             data: err instanceof Error ? err.message : String(err)
           }
-        };
-        process.stdout.write(JSON.stringify(errorResponse) + '\n');
+        }
+
+        process.stdout.write(JSON.stringify(errorResponse) + '\n')
       }
     } else {
-      log('non-request message', msg)
-      // For messages that don't look like a request (e.g. notifications or responses):
-      // Some notifications (like "notifications/initialized") may not have an "id" or "method".
-      // If the downstream side expects a fully formed JSON‑RPC message, you can
-      // choose to add an "id" (for instance, null) or leave it as is.
-      // Here we add an "id" if missing so that it passes the validator.
-      let outMsg = msg;
-      // if (!('id' in outMsg)) {
-      //   // @ts-ignore-next-line
-      //   outMsg = { ...outMsg, id: null };
-      // }
-      log('Forwarding remote SSE message to stdio:', outMsg);
-      process.stdout.write(JSON.stringify(outMsg) + '\n');
+      log('Forwarding SSE message to stdio:', message)
+      process.stdout.write(JSON.stringify(message) + '\n')
     }
-  };
+  }
 
-  log('Local server is now available on stdio.')
-  log('Waiting for messages...')
+  log('Stdio server is now listening')
 }
 
-// --------------------------------------------------
-// Main
-// --------------------------------------------------
 async function main() {
   const argv = yargs(hideBin(process.argv))
     .option('port', {
@@ -270,7 +233,7 @@ async function main() {
     })
     .option('sse', {
       type: 'string',
-      description: 'Remote SSE URL (sse->stdio mode)'
+      description: 'SSE URL (sse->stdio mode)'
     })
     .option('baseUrl', {
       type: 'string',
@@ -293,7 +256,6 @@ async function main() {
   const hasStdio = Boolean(argv.stdio)
   const hasSse = Boolean(argv.sse)
 
-  // Validate that exactly one mode was chosen
   if (hasStdio && hasSse) {
     console.error('[supergateway] Error: Specify only one of --stdio or --sse, not both.')
     process.exit(1)
@@ -302,9 +264,8 @@ async function main() {
     process.exit(1)
   }
 
-  // Launch appropriate mode
   if (hasStdio) {
-    await runStdioToSseGateway(
+    await stdioToSse(
       argv.stdio!,
       argv.port,
       argv.baseUrl,
@@ -312,7 +273,7 @@ async function main() {
       argv.messagePath
     )
   } else {
-    await runSseToStdioGateway(argv.sse!)
+    await sseToStdio(argv.sse!)
   }
 }
 
