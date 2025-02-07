@@ -2,7 +2,7 @@
 
 **Supergateway** runs a **MCP stdio-based servers** over **SSE (Server-Sent Events)** with one command. This is useful for remote access, debugging, or connecting to SSE-based clients when your MCP server only speaks stdio.
 
-Supported by [superinterface.ai](https://superinterface.ai), [supermachine.ai](https://supermachine.ai] and [supercorp.ai](https://supercorp.ai).
+Supported by [superinterface.ai](https://superinterface.ai), [supermachine.ai](https://supermachine.ai) and [supercorp.ai](https://supercorp.ai).
 
 ## Installation & Usage
 
