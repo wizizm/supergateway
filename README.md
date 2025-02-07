@@ -2,7 +2,7 @@
 
 **Supergateway** runs a **MCP stdio-based servers** over **SSE (Server-Sent Events)** with one command. This is useful for remote access, debugging, or connecting to SSE-based clients when your MCP server only speaks stdio.
 
-Supported by [superinterface.ai](https://superinterface.ai) and [supercorp.ai](https://supercorp.ai).
+Supported by [superinterface.ai](https://superinterface.ai), [supermachine.ai](https://supermachine.ai] and [supercorp.ai](https://supercorp.ai).
 
 ## Installation & Usage
 
@@ -17,7 +17,7 @@ npx -y supergateway --stdio "uvx mcp-server-git"
 - **`--baseUrl "http://localhost:8000"`**: Base URL for SSE clients (stdio to SSE mode; optional)
 - **`--ssePath "/sse"`**: Path for SSE subscriptions (stdio to SSE mode; default: `/sse`)
 - **`--messagePath "/message"`**: Path for SSE messages (stdio to SSE mode; default: `/message`)
-- **`--sse "https://mcp-server.superinterface.app"`**: SSE URL to connect to
+- **`--sse "https://mcp-server.supermachine.app"`**: SSE URL to connect to
 
 Once started on SSE:
 - **SSE endpoint**: `GET http://localhost:8000/sse`
@@ -30,7 +30,7 @@ Supergateway also supports running in **SSE to Stdio** mode. Instead of providin
 Example:
 
 ```bash
-npx -y supergateway --sse "https://mcp-server-example.superinterface.app"
+npx -y supergateway --sse "https://mcp-server-example.supermachine.app"
 ```
 
 ## Example with MCP Inspector
