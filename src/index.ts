@@ -2,7 +2,7 @@
 /**
  * index.ts
  *
- * Run MCP stdio servers over SSE or visa versa
+ * Run MCP stdio servers over SSE or vice versa
  *
  * Usage:
  *   # stdio -> SSE
@@ -74,7 +74,8 @@ const stdioToSse = async (
     { capabilities: {} }
   )
 
-  let sseTransport: SSEServerTransport | undefined
+  const sessions: Record<string, { transport: SSEServerTransport; response: express.Response }> = {}
+
   const app = express()
   app.use((req, res, next) => {
     if (req.path === messagePath) return next()
@@ -83,28 +84,53 @@ const stdioToSse = async (
 
   app.get(ssePath, async (req, res) => {
     log(`New SSE connection from ${req.ip}`)
-    sseTransport = new SSEServerTransport(`${baseUrl}${messagePath}`, res)
+
+    const sseTransport = new SSEServerTransport(`${baseUrl}${messagePath}`, res)
     await server.connect(sseTransport)
+
+    const sessionId = sseTransport.sessionId
+
+    if (sessionId) {
+      sessions[sessionId] = { transport: sseTransport, response: res }
+    }
+
     sseTransport.onmessage = (msg: JSONRPCMessage) => {
       const line = JSON.stringify(msg)
-      log(`SSE → Child: ${line}`)
+      log(`SSE → Child (session ${sessionId}): ${line}`)
       child.stdin.write(line + '\n')
     }
+
     sseTransport.onclose = () => {
-      log('SSE connection closed')
+      log(`SSE connection closed (session ${sessionId})`)
+      delete sessions[sessionId]
     }
+
     sseTransport.onerror = err => {
-      logStderr('SSE error:', err)
+      logStderr(`SSE error (session ${sessionId}):`, err)
+      delete sessions[sessionId]
     }
+
+    req.on('close', () => {
+      log(`Client disconnected (session ${sessionId})`)
+      delete sessions[sessionId]
+    })
   })
 
+  // @ts-ignore: ignoring potential type mismatch from express
   app.post(messagePath, async (req, res) => {
-    if (sseTransport?.handlePostMessage) {
-      log('POST to SSE transport')
-      await sseTransport.handlePostMessage(req, res)
+    const sessionId = req.query.sessionId as string
+
+    if (!sessionId) {
+      return res.status(400).send('Missing sessionId parameter')
     }
-    else {
-      res.status(503).send('No SSE connection active')
+
+    const session = sessions[sessionId]
+
+    if (session?.transport?.handlePostMessage) {
+      log(`POST to SSE transport (session ${sessionId})`)
+      await session.transport.handlePostMessage(req, res)
+    } else {
+      res.status(503).send(`No active SSE connection for session ${sessionId}`)
     }
   })
 
@@ -124,9 +150,17 @@ const stdioToSse = async (
       try {
         const jsonMsg = JSON.parse(line)
         log('Child → SSE:', jsonMsg)
-        sseTransport?.send(jsonMsg)
-      }
-      catch {
+
+        // Broadcast to all sessions
+        for (const [sid, session] of Object.entries(sessions)) {
+          try {
+            session.transport.send(jsonMsg)
+          } catch (err) {
+            logStderr(`Failed to send to session ${sid}:`, err)
+            delete sessions[sid]
+          }
+        }
+      } catch {
         logStderr(`Child non-JSON: ${line}`)
       }
     })
