@@ -59,9 +59,75 @@ ngrok http 8000
 
 ngrok then provides a public URL.
 
+## Running with Docker
+
+This repository includes a Dockerfile for containerized deployments using Node 20. This lets you run Supergateway without managing local Node.js dependencies.
+
+**Build the Docker image:**
+
+```bash
+docker build -t supergateway .
+```
+
+**Run the Docker container:**
+
+```bash
+docker run -it --rm -p 8000:8000 supergateway \
+    --stdio "npx -y @modelcontextprotocol/server-filesystem /" \
+    --port 8000
+```
+
+In this setup, the MCP server works on the container’s root directory (`/`). You can mount a host directory if needed.
+
+## Using with Claude Desktop (SSE → Stdio Mode)
+
+Claude Desktop can connect to Supergateway’s SSE endpoint when Supergateway is running in SSE → Stdio mode. In this configuration, Supergateway connects to a remote SSE-based MCP server and exposes a local stdio interface for Claude Desktop. Configure Claude Desktop’s MCP server settings with one of the examples below, and then point Claude Desktop to:
+
+```
+http://localhost:8000/sse
+```
+
+### NPX-Based MCP Server Example
+
+```json
+{
+  "mcpServers": {
+    "supermachineExampleNpx": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "supergateway",
+        "--sse",
+        "https://mcp-server-example.supermachine.app"
+      ]
+    }
+  }
+}
+```
+
+### Docker-Based MCP Server Example
+
+```json
+{
+  "mcpServers": {
+    "supermachineExampleDocker": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "supergateway",
+        "--sse",
+        "https://mcp-server-example.supermachine.app"
+      ]
+    }
+  }
+}
+```
+
 ## Why MCP?
 
-[Model Context Protocol](https://spec.modelcontextprotocol.io/) standardizes how AI tools exchange data. If your MCP server only speaks stdio, Supergateway exposes an SSE-based interface so remote clients (and tools like MCP Inspector) can connect without extra server changes.
+[Model Context Protocol](https://spec.modelcontextprotocol.io/) standardizes how AI tools exchange data. If your MCP server only speaks stdio, Supergateway exposes an SSE-based interface so remote clients (and tools like MCP Inspector or Claude Desktop) can connect without extra server changes.
 
 ## Advanced Configuration
 
