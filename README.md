@@ -81,11 +81,7 @@ In this setup, the MCP server works on the container’s root directory (`/`). Y
 
 ## Using with Claude Desktop (SSE → Stdio Mode)
 
-Claude Desktop can connect to Supergateway’s SSE endpoint when Supergateway is running in SSE → Stdio mode. In this configuration, Supergateway connects to a remote SSE-based MCP server and exposes a local stdio interface for Claude Desktop. Configure Claude Desktop’s MCP server settings with one of the examples below, and then point Claude Desktop to:
-
-```
-http://localhost:8000/sse
-```
+Claude Desktop can connect to Supergateway’s SSE endpoint when Supergateway is running in SSE → Stdio mode.
 
 ### NPX-Based MCP Server Example
 
