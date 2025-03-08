@@ -18,6 +18,7 @@ npx -y supergateway --stdio "uvx mcp-server-git"
 - **`--ssePath "/sse"`**: Path for SSE subscriptions (stdio to SSE mode; default: `/sse`)
 - **`--messagePath "/message"`**: Path for SSE messages (stdio to SSE mode; default: `/message`)
 - **`--sse "https://mcp-server.supermachine.app"`**: SSE URL to connect to
+- **`--logLevel info | none`**: Controls logging level (default: `info`). Use `none` to suppress all logs.
 
 Once started on SSE:
 - **SSE endpoint**: `GET http://localhost:8000/sse`
