@@ -1,6 +1,6 @@
 {
   "name": "supergateway",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Run MCP stdio servers over SSE or visa versa",
   "repository": {
     "type": "git",
@@ -25,11 +25,13 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.4.1",
     "body-parser": "^1.20.3",
+    "cors": "^2.8.5",
     "express": "^4.21.2",
     "yargs": "^17.7.2"
   },
   "devDependencies": {
     "@types/body-parser": "^1.19.5",
+    "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/node": "^22.13.0",
     "@types/yargs": "^17.0.33",

@@ -15,6 +15,7 @@
 
 import express from 'express'
 import bodyParser from 'body-parser'
+import cors from 'cors'
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process'
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
@@ -63,10 +64,21 @@ interface StdioToSseArgs {
   ssePath: string
   messagePath: string
   logger: Logger
+  enableCors: boolean
+  healthEndpoints: string[]
 }
 
 async function stdioToSse(args: StdioToSseArgs) {
-  const { stdioCmd, port, baseUrl, ssePath, messagePath, logger } = args
+  const {
+    stdioCmd,
+    port,
+    baseUrl,
+    ssePath,
+    messagePath,
+    logger,
+    enableCors,
+    healthEndpoints
+  } = args
 
   logger.info('Starting...')
   logger.info('Supergateway is supported by Superinterface - https://superinterface.ai')
@@ -77,6 +89,9 @@ async function stdioToSse(args: StdioToSseArgs) {
   }
   logger.info(`  - ssePath: ${ssePath}`)
   logger.info(`  - messagePath: ${messagePath}`)
+
+  logger.info(`  - CORS enabled: ${enableCors}`)
+  logger.info(`  - Health endpoints: ${healthEndpoints.length ? healthEndpoints.join(', ') : '(none)'}`)
 
   const child: ChildProcessWithoutNullStreams = spawn(stdioCmd, { shell: true })
   child.on('exit', (code, signal) => {
@@ -92,10 +107,21 @@ async function stdioToSse(args: StdioToSseArgs) {
   const sessions: Record<string, { transport: SSEServerTransport; response: express.Response }> = {}
 
   const app = express()
+
+  if (enableCors) {
+    app.use(cors())
+  }
+
   app.use((req, res, next) => {
     if (req.path === messagePath) return next()
     return bodyParser.json()(req, res, next)
   })
+
+  for (const ep of healthEndpoints) {
+    app.get(ep, (_req, res) => {
+      res.send('ok')
+    })
+  }
 
   app.get(ssePath, async (req, res) => {
     logger.info(`New SSE connection from ${req.ip}`)
@@ -306,6 +332,16 @@ async function main() {
       default: 'info',
       description: 'Set logging level: "info" or "none"'
     })
+    .option('cors', {
+      type: 'boolean',
+      default: false,
+      description: 'Enable CORS'
+    })
+    .option('healthEndpoint', {
+      type: 'array',
+      default: [],
+      description: 'One or more endpoints returning "ok", e.g. --healthEndpoint /healthz --healthEndpoint /readyz'
+    })
     .help()
     .parseSync()
 
@@ -330,7 +366,9 @@ async function main() {
         messagePath: argv.messagePath,
         logger: argv.logLevel === 'none'
           ? noneLogger
-          : { info: log, error: logStderr }
+          : { info: log, error: logStderr },
+        enableCors: argv.cors,
+        healthEndpoints: argv.healthEndpoint as string[]
       })
     } else {
       await sseToStdio({
