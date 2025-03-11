@@ -17,7 +17,7 @@ npx -y supergateway --stdio "uvx mcp-server-git"
 - **`--baseUrl "http://localhost:8000"`**: Base URL for SSE clients (stdio to SSE mode; optional)
 - **`--ssePath "/sse"`**: Path for SSE subscriptions (stdio to SSE mode; default: `/sse`)
 - **`--messagePath "/message"`**: Path for SSE messages (stdio to SSE mode; default: `/message`)
-- **`--sse "https://mcp-server.supermachine.app"`**: SSE URL to connect to
+- **`--sse "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"`**: SSE URL to connect to
 - **`--logLevel info | none`**: Controls logging level (default: `info`). Use `none` to suppress all logs.
 - **`--cors`**: Enable CORS
 - **`--healthEndpoint /healthz`**: Register one or more endpoints (can be used multiple times) that respond with `"ok"`
@@ -33,7 +33,7 @@ Supergateway also supports running in **SSE to Stdio** mode. Instead of providin
 Example:
 
 ```bash
-npx -y supergateway --sse "https://mcp-server-example.supermachine.app"
+npx -y supergateway --sse "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"
 ```
 
 ## Example with MCP Inspector
@@ -97,7 +97,7 @@ Claude Desktop can connect to Supergateway’s SSE endpoint when Supergateway is
         "-y",
         "supergateway",
         "--sse",
-        "https://mcp-server-example.supermachine.app"
+        "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"
       ]
     }
   }
@@ -117,7 +117,7 @@ Claude Desktop can connect to Supergateway’s SSE endpoint when Supergateway is
         "--rm",
         "supergateway",
         "--sse",
-        "https://mcp-server-example.supermachine.app"
+        "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"
       ]
     }
   }
