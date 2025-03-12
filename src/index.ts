@@ -68,6 +68,17 @@ interface StdioToSseArgs {
   healthEndpoints: string[]
 }
 
+const onSignals = ({ logger }: { logger: Logger }) => {
+  process.on('SIGINT', () => {
+    logger.info('Caught SIGINT. Exiting...')
+    process.exit(0)
+  })
+  process.on('SIGTERM', () => {
+    logger.info('Caught SIGTERM. Exiting...')
+    process.exit(0)
+  })
+}
+
 async function stdioToSse(args: StdioToSseArgs) {
   const {
     stdioCmd,
@@ -92,6 +103,8 @@ async function stdioToSse(args: StdioToSseArgs) {
 
   logger.info(`  - CORS enabled: ${enableCors}`)
   logger.info(`  - Health endpoints: ${healthEndpoints.length ? healthEndpoints.join(', ') : '(none)'}`)
+
+  onSignals({ logger })
 
   const child: ChildProcessWithoutNullStreams = spawn(stdioCmd, { shell: true })
   child.on('exit', (code, signal) => {
@@ -218,6 +231,8 @@ async function sseToStdio(args: SseToStdioArgs) {
   logger.info('Supergateway is supported by Superinterface - https://superinterface.ai')
   logger.info(`  - sse: ${sseUrl}`)
   logger.info('Connecting to SSE...')
+
+  onSignals({ logger })
 
   const sseTransport = new SSEClientTransport(new URL(sseUrl))
   const sseClient = new Client(
