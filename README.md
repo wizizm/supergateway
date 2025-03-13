@@ -64,23 +64,30 @@ ngrok then provides a public URL.
 
 ## Running with Docker
 
-This repository includes a Dockerfile for containerized deployments using Node 20. This lets you run Supergateway without managing local Node.js dependencies.
+A Docker-based workflow avoids local Node.js setup. A ready-to-run Docker image is available here:
+[supercorp/supergateway](https://hub.docker.com/r/supercorp/supergateway).
 
-**Build the Docker image:**
-
-```bash
-docker build -t supergateway .
-```
-
-**Run the Docker container:**
+### Using the Official Image
 
 ```bash
-docker run -it --rm -p 8000:8000 supergateway \
+docker run -it --rm -p 8000:8000 supercorp/supergateway \
     --stdio "npx -y @modelcontextprotocol/server-filesystem /" \
     --port 8000
 ```
 
-In this setup, the MCP server works on the container’s root directory (`/`). You can mount a host directory if needed.
+Docker will pull the image automatically if you don’t have it locally. The MCP server works on the container’s root directory (`/`), though you can mount a host directory if desired.
+
+### Building the Image Yourself
+
+Use the provided Dockerfile if you’d rather build it on your own:
+
+```bash
+docker build -t supergateway .
+
+docker run -it --rm -p 8000:8000 supergateway \
+    --stdio "npx -y @modelcontextprotocol/server-filesystem /" \
+    --port 8000
+```
 
 ## Using with Claude Desktop (SSE → Stdio Mode)
 
@@ -115,7 +122,7 @@ Claude Desktop can connect to Supergateway’s SSE endpoint when Supergateway is
         "run",
         "-i",
         "--rm",
-        "supergateway",
+        "supercorp/supergateway",
         "--sse",
         "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"
       ]
