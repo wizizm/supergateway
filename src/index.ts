@@ -73,8 +73,19 @@ const onSignals = ({ logger }: { logger: Logger }) => {
     logger.info('Caught SIGINT. Exiting...')
     process.exit(0)
   })
+
   process.on('SIGTERM', () => {
     logger.info('Caught SIGTERM. Exiting...')
+    process.exit(0)
+  })
+
+  process.on('SIGHUP', () => {
+    logger.info('Caught SIGHUP. Exiting...');
+    process.exit(0);
+  })
+
+  process.stdin.on('close', () => {
+    logger.info('stdin closed. Exiting...');
     process.exit(0)
   })
 }
