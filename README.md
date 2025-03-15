@@ -14,6 +14,7 @@ npx -y supergateway --stdio "uvx mcp-server-git"
 
 - **`--port 8000`**: Port to listen on (default: `8000`)
 - **`--stdio "command"`**: Command that runs an MCP server over stdio
+- **`--ws`**: Can be used along with `--stdio` to expose a WebSocket endpoint for MCP clients instead of SSE.
 - **`--baseUrl "http://localhost:8000"`**: Base URL for SSE clients (stdio to SSE mode; optional)
 - **`--ssePath "/sse"`**: Path for SSE subscriptions (stdio to SSE mode; default: `/sse`)
 - **`--messagePath "/message"`**: Path for SSE messages (stdio to SSE mode; default: `/message`)
@@ -21,6 +22,7 @@ npx -y supergateway --stdio "uvx mcp-server-git"
 - **`--logLevel info | none`**: Controls logging level (default: `info`). Use `none` to suppress all logs.
 - **`--cors`**: Enable CORS
 - **`--healthEndpoint /healthz`**: Register one or more endpoints (can be used multiple times) that respond with `"ok"`
+- **`--healthPort 8080`**: Port to run health endpoints on (default: `8080`). Used only if `--healthEndpoint` is provided and `--stdio --ws` is also provided.
 
 Once started on SSE:
 - **SSE endpoint**: `GET http://localhost:8000/sse`
