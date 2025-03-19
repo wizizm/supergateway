@@ -6,6 +6,7 @@ import { JSONRPCMessage, JSONRPCRequest } from '@modelcontextprotocol/sdk/types.
 import { z } from 'zod'
 import { getVersion } from '../lib/getVersion.js'
 import { Logger } from '../types.js'
+import { onSignals } from '../lib/onSignals.js'
 
 export interface SseToStdioArgs {
   sseUrl: string
@@ -16,33 +17,11 @@ export async function sseToStdio(args: SseToStdioArgs) {
   const { sseUrl, logger } = args
 
   logger.info('Starting...')
-  logger.info('Supergateway is supported by Superinterface - https://superinterface.ai')
   logger.info(`  - sse: ${sseUrl}`)
   logger.info('Connecting to SSE...')
 
-  const onSignals = () => {
-    process.on('SIGINT', () => {
-      logger.info('Caught SIGINT. Exiting...')
-      process.exit(0)
-    })
-  
-    process.on('SIGTERM', () => {
-      logger.info('Caught SIGTERM. Exiting...')
-      process.exit(0)
-    })
-  
-    process.on('SIGHUP', () => {
-      logger.info('Caught SIGHUP. Exiting...');
-      process.exit(0);
-    })
-  
-    process.stdin.on('close', () => {
-      logger.info('stdin closed. Exiting...');
-      process.exit(0)
-    })
-  }
-
-  onSignals()
+  // Set up signal handlers
+  onSignals({ logger })
 
   const sseTransport = new SSEClientTransport(new URL(sseUrl))
   const sseClient = new Client(

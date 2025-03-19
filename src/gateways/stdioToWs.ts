@@ -6,6 +6,7 @@ import { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js'
 import { Logger } from '../types.js'
 import { getVersion } from '../lib/getVersion.js'
 import { WebSocketServerTransport } from '../server/websocket.js'
+import { onSignals } from '../lib/onSignals.js'
 
 export interface StdioToWsArgs {
   stdioCmd: string
@@ -45,9 +46,11 @@ export async function stdioToWs(args: StdioToWsArgs) {
     }
   }
 
-  // Handle process termination
-  process.on('SIGINT', cleanup)
-  process.on('SIGTERM', cleanup)
+  // Set up signal handlers
+  onSignals({
+    logger,
+    cleanup
+  })
 
   if (healthEndpoints.length > 0) {
     const app = express()

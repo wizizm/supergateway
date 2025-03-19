@@ -7,6 +7,7 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js'
 import { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js'
 import { Logger } from '../types.js'
 import { getVersion } from '../lib/getVersion.js'
+import { onSignals } from '../lib/onSignals.js'
 
 export interface StdioToSseArgs {
   stdioCmd: string
@@ -32,7 +33,6 @@ export async function stdioToSse(args: StdioToSseArgs) {
   } = args
 
   logger.info('Starting...')
-  logger.info('Supergateway is supported by Superinterface - https://superinterface.ai')
   logger.info(`  - port: ${port}`)
   logger.info(`  - stdio: ${stdioCmd}`)
   if (baseUrl) {
@@ -44,29 +44,8 @@ export async function stdioToSse(args: StdioToSseArgs) {
   logger.info(`  - CORS enabled: ${enableCors}`)
   logger.info(`  - Health endpoints: ${healthEndpoints.length ? healthEndpoints.join(', ') : '(none)'}`)
 
-  const onSignals = () => {
-    process.on('SIGINT', () => {
-      logger.info('Caught SIGINT. Exiting...')
-      process.exit(0)
-    })
-  
-    process.on('SIGTERM', () => {
-      logger.info('Caught SIGTERM. Exiting...')
-      process.exit(0)
-    })
-  
-    process.on('SIGHUP', () => {
-      logger.info('Caught SIGHUP. Exiting...');
-      process.exit(0);
-    })
-  
-    process.stdin.on('close', () => {
-      logger.info('stdin closed. Exiting...');
-      process.exit(0)
-    })
-  }
-
-  onSignals()
+  // Set up signal handlers
+  onSignals({ logger })
 
   const child: ChildProcessWithoutNullStreams = spawn(stdioCmd, { shell: true })
   child.on('exit', (code, signal) => {
