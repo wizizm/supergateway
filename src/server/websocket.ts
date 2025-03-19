@@ -2,7 +2,6 @@ import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
 import { v4 as uuidv4 } from "uuid";
 import { WebSocket, WebSocketServer } from "ws";
-const SUBPROTOCOL = "mcp";
 
 /**
  * Server transport for WebSocket: this will create a WebSocket server that clients can connect to.
@@ -102,8 +101,8 @@ export class WebSocketServerTransport implements Transport {
         this.clients.delete(cId);
         this.ondisconnection?.(cId);
       }
-    } 
-    
+    }
+
     for (const [id, client] of this.clients.entries()) {
       if (client.readyState !== WebSocket.OPEN) {
         deadClients.push(id);
