@@ -27,13 +27,13 @@ const log = (...args: any[]) => console.log('[supergateway]', ...args)
 const logStderr = (...args: any[]) => console.error('[supergateway]', ...args)
 
 const noneLogger: Logger = {
-  info: () => { },
-  error: () => { }
+  info: () => {},
+  error: () => {},
 }
 
 const getLogger = ({
   logLevel,
-  outputTransport
+  outputTransport,
 }: {
   logLevel: string
   outputTransport: string
@@ -53,11 +53,11 @@ async function main() {
   const argv = yargs(hideBin(process.argv))
     .option('stdio', {
       type: 'string',
-      description: 'Command to run an MCP server over Stdio'
+      description: 'Command to run an MCP server over Stdio',
     })
     .option('sse', {
       type: 'string',
-      description: 'SSE URL to connect to'
+      description: 'SSE URL to connect to',
     })
     .option('outputTransport', {
       type: 'string',
@@ -70,47 +70,50 @@ async function main() {
 
         return undefined
       },
-      description: 'Transport for output messages. Default is "sse" when using --stdio and "stdio" when using --sse.'
+      description:
+        'Transport for output messages. Default is "sse" when using --stdio and "stdio" when using --sse.',
     })
     .option('port', {
       type: 'number',
       default: 8000,
-      description: '(stdio→SSE or stdio→WS) Port to run on'
+      description: '(stdio→SSE or stdio→WS) Port to run on',
     })
     .option('baseUrl', {
       type: 'string',
       default: '',
-      description: '(stdio→SSE or stdio→WS) Base URL for SSE or WS server'
+      description: '(stdio→SSE or stdio→WS) Base URL for SSE or WS server',
     })
     .option('ssePath', {
       type: 'string',
       default: '/sse',
-      description: '(stdio→SSE) Path for SSE subscriptions'
+      description: '(stdio→SSE) Path for SSE subscriptions',
     })
     .option('messagePath', {
       type: 'string',
       default: '/message',
-      description: '(stdio→SSE) Path for SSE messages. (stdio→WS) Path for WebSocket messages.'
+      description:
+        '(stdio→SSE) Path for SSE messages. (stdio→WS) Path for WebSocket messages.',
     })
     .option('logLevel', {
       choices: ['info', 'none'] as const,
       default: 'info',
-      description: 'Logging level'
+      description: 'Logging level',
     })
     .option('cors', {
       type: 'boolean',
       default: false,
-      description: 'Enable CORS'
+      description: 'Enable CORS',
     })
     .option('healthEndpoint', {
       type: 'array',
       default: [],
-      description: 'One or more endpoints returning "ok", e.g. --healthEndpoint /healthz --healthEndpoint /readyz'
+      description:
+        'One or more endpoints returning "ok", e.g. --healthEndpoint /healthz --healthEndpoint /readyz',
     })
     .option('healthPort', {
       type: 'number',
       default: 8080,
-      description: 'Port to run health endpoints on'
+      description: 'Port to run health endpoints on',
     })
     .help()
     .parseSync()
@@ -132,7 +135,9 @@ async function main() {
   })
 
   logger.info('Starting...')
-  logger.info('Supergateway is supported by Superinterface - https://superinterface.ai')
+  logger.info(
+    'Supergateway is supported by Superinterface - https://superinterface.ai',
+  )
   logger.info(`  - outputTransport: ${argv.outputTransport}`)
 
   try {
@@ -157,7 +162,7 @@ async function main() {
           logger,
           enableCors: argv.cors,
           healthEndpoints: argv.healthEndpoint as string[],
-          healthPort: argv.healthPort
+          healthPort: argv.healthPort,
         })
       } else {
         logStderr(`Error: stdio→${argv.outputTransport} not supported`)

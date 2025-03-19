@@ -20,8 +20,17 @@ export interface StdioToWsArgs {
 }
 
 export async function stdioToWs(args: StdioToWsArgs) {
-  const { stdioCmd, port, baseUrl, messagePath, logger, healthEndpoints, healthPort, enableCors } = args
-  const hostname = baseUrl ? new URL(baseUrl).hostname : "0.0.0.0"
+  const {
+    stdioCmd,
+    port,
+    baseUrl,
+    messagePath,
+    logger,
+    healthEndpoints,
+    healthPort,
+    enableCors,
+  } = args
+  const hostname = baseUrl ? new URL(baseUrl).hostname : '0.0.0.0'
   logger.info('Starting...')
   logger.info(`  - port: ${port}`)
   logger.info(`  - stdio: ${stdioCmd}`)
@@ -37,7 +46,7 @@ export async function stdioToWs(args: StdioToWsArgs) {
   // Cleanup function
   const cleanup = () => {
     if (wsTransport) {
-      wsTransport.close().catch(err => {
+      wsTransport.close().catch((err) => {
         logger.error(`Error stopping WebSocket server: ${err.message}`)
       })
     }
@@ -49,7 +58,7 @@ export async function stdioToWs(args: StdioToWsArgs) {
   // Set up signal handlers
   onSignals({
     logger,
-    cleanup
+    cleanup,
   })
 
   if (healthEndpoints.length > 0) {
@@ -60,12 +69,12 @@ export async function stdioToWs(args: StdioToWsArgs) {
     for (const ep of healthEndpoints) {
       app.get(ep, (_req: express.Request, res: express.Response) => {
         if (child?.killed) {
-          res.status(500).send("Child process has been killed")
+          res.status(500).send('Child process has been killed')
         }
         if (!isReady) {
-          res.status(500).send("Server is not ready")
+          res.status(500).send('Server is not ready')
         } else {
-          res.send("OK")
+          res.send('OK')
         }
       })
     }
@@ -84,7 +93,7 @@ export async function stdioToWs(args: StdioToWsArgs) {
 
     const server = new Server(
       { name: 'supergateway', version: getVersion() },
-      { capabilities: {} }
+      { capabilities: {} },
     )
 
     // Handle child process output
@@ -93,13 +102,13 @@ export async function stdioToWs(args: StdioToWsArgs) {
       buffer += chunk.toString('utf8')
       const lines = buffer.split(/\r?\n/)
       buffer = lines.pop() ?? ''
-      lines.forEach(line => {
+      lines.forEach((line) => {
         if (!line.trim()) return
         try {
           const jsonMsg = JSON.parse(line)
           logger.info(`Child → WebSocket: ${JSON.stringify(jsonMsg)}`)
           // Broadcast to all connected clients
-          wsTransport?.send(jsonMsg, jsonMsg.id).catch(err => {
+          wsTransport?.send(jsonMsg, jsonMsg.id).catch((err) => {
             logger.error('Failed to broadcast message:', err)
           })
         } catch {
@@ -112,7 +121,12 @@ export async function stdioToWs(args: StdioToWsArgs) {
       logger.info(`Child stderr: ${chunk.toString('utf8')}`)
     })
 
-    wsTransport = new WebSocketServerTransport(hostname, port, messagePath, enableCors)
+    wsTransport = new WebSocketServerTransport(
+      hostname,
+      port,
+      messagePath,
+      enableCors,
+    )
     await server.connect(wsTransport)
 
     wsTransport.onmessage = (msg: JSONRPCMessage) => {

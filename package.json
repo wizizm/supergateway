@@ -20,7 +20,9 @@
   },
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "format": "prettier --write 'src/**/*.ts' '*.json' '.prettierrc'",
+    "format:check": "prettier --check 'src/**/*.ts' '*.json' '.prettierrc'"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.4.1",
@@ -38,6 +40,7 @@
     "@types/node": "^22.13.0",
     "@types/ws": "^8.18.0",
     "@types/yargs": "^17.0.33",
+    "prettier": "^3.5.3",
     "ts-node": "^10.9.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"

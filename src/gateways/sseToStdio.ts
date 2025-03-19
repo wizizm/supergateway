@@ -2,7 +2,10 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js'
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
-import { JSONRPCMessage, JSONRPCRequest } from '@modelcontextprotocol/sdk/types.js'
+import {
+  JSONRPCMessage,
+  JSONRPCRequest,
+} from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
 import { getVersion } from '../lib/getVersion.js'
 import { Logger } from '../types.js'
@@ -26,10 +29,10 @@ export async function sseToStdio(args: SseToStdioArgs) {
   const sseTransport = new SSEClientTransport(new URL(sseUrl))
   const sseClient = new Client(
     { name: 'supergateway', version: getVersion() },
-    { capabilities: {} }
+    { capabilities: {} },
   )
 
-  sseTransport.onerror = err => {
+  sseTransport.onerror = (err) => {
     logger.error('SSE error:', err)
   }
   sseTransport.onclose = () => {
@@ -41,8 +44,11 @@ export async function sseToStdio(args: SseToStdioArgs) {
   logger.info('SSE connected')
 
   const stdioServer = new Server(
-    sseClient.getServerVersion() ?? { name: 'supergateway', version: getVersion() },
-    { capabilities: sseClient.getServerCapabilities() }
+    sseClient.getServerVersion() ?? {
+      name: 'supergateway',
+      version: getVersion(),
+    },
+    { capabilities: sseClient.getServerCapabilities() },
   )
   const stdioTransport = new StdioServerTransport()
   await stdioServer.connect(stdioTransport)
@@ -88,7 +94,7 @@ export async function sseToStdio(args: SseToStdioArgs) {
         req,
         result.hasOwnProperty('error')
           ? { error: { ...result.error } }
-          : { result: { ...result } }
+          : { result: { ...result } },
       )
       logger.info('Response:', response)
       process.stdout.write(JSON.stringify(response) + '\n')

@@ -29,7 +29,7 @@ export async function stdioToSse(args: StdioToSseArgs) {
     messagePath,
     logger,
     enableCors,
-    healthEndpoints
+    healthEndpoints,
   } = args
 
   logger.info('Starting...')
@@ -42,7 +42,9 @@ export async function stdioToSse(args: StdioToSseArgs) {
   logger.info(`  - messagePath: ${messagePath}`)
 
   logger.info(`  - CORS enabled: ${enableCors}`)
-  logger.info(`  - Health endpoints: ${healthEndpoints.length ? healthEndpoints.join(', ') : '(none)'}`)
+  logger.info(
+    `  - Health endpoints: ${healthEndpoints.length ? healthEndpoints.join(', ') : '(none)'}`,
+  )
 
   // Set up signal handlers
   onSignals({ logger })
@@ -55,10 +57,13 @@ export async function stdioToSse(args: StdioToSseArgs) {
 
   const server = new Server(
     { name: 'supergateway', version: getVersion() },
-    { capabilities: {} }
+    { capabilities: {} },
   )
 
-  const sessions: Record<string, { transport: SSEServerTransport; response: express.Response }> = {}
+  const sessions: Record<
+    string,
+    { transport: SSEServerTransport; response: express.Response }
+  > = {}
 
   const app = express()
 
@@ -98,7 +103,7 @@ export async function stdioToSse(args: StdioToSseArgs) {
       delete sessions[sessionId]
     }
 
-    sseTransport.onerror = err => {
+    sseTransport.onerror = (err) => {
       logger.error(`SSE error (session ${sessionId}):`, err)
       delete sessions[sessionId]
     }
@@ -136,7 +141,7 @@ export async function stdioToSse(args: StdioToSseArgs) {
     buffer += chunk.toString('utf8')
     const lines = buffer.split(/\r?\n/)
     buffer = lines.pop() ?? ''
-    lines.forEach(line => {
+    lines.forEach((line) => {
       if (!line.trim()) return
       try {
         const jsonMsg = JSON.parse(line)
