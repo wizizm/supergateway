@@ -70,7 +70,7 @@ export async function stdioToWs(args: StdioToWsArgs) {
         if (!isReady) {
           res.status(500).send('Server is not ready')
         } else {
-          res.send('OK')
+          res.send('ok')
         }
       })
     }
