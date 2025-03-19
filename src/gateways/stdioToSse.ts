@@ -32,7 +32,6 @@ export async function stdioToSse(args: StdioToSseArgs) {
     healthEndpoints,
   } = args
 
-  logger.info('Starting...')
   logger.info(`  - port: ${port}`)
   logger.info(`  - stdio: ${stdioCmd}`)
   if (baseUrl) {

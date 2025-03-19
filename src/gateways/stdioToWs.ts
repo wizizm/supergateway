@@ -29,13 +29,17 @@ export async function stdioToWs(args: StdioToWsArgs) {
     enableCors,
   } = args
   const hostname = baseUrl ? new URL(baseUrl).hostname : '0.0.0.0'
-  logger.info('Starting...')
+
   logger.info(`  - port: ${port}`)
   logger.info(`  - stdio: ${stdioCmd}`)
   if (baseUrl) {
     logger.info(`  - baseUrl: ${baseUrl}`)
   }
   logger.info(`  - messagePath: ${messagePath}`)
+  logger.info(`  - CORS enabled: ${enableCors}`)
+  logger.info(
+    `  - Health endpoints: ${healthEndpoints.length ? healthEndpoints.join(', ') : '(none)'}`,
+  )
 
   let wsTransport: WebSocketServerTransport | null = null
   let child: ChildProcessWithoutNullStreams | null = null

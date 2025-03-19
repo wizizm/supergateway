@@ -19,7 +19,6 @@ export interface SseToStdioArgs {
 export async function sseToStdio(args: SseToStdioArgs) {
   const { sseUrl, logger } = args
 
-  logger.info('Starting...')
   logger.info(`  - sse: ${sseUrl}`)
   logger.info('Connecting to SSE...')
 
