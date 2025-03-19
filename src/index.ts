@@ -10,7 +10,7 @@
  *                       --port 8000 --baseUrl http://localhost:8000 --ssePath /sse --messagePath /message
  *
  *   # SSE -> stdio
- *   npx -y supergateway --sse "https://mcp-server-715510c7-0eb2-4b71-8d90-b49871f202dc.supermachine.app"
+ *   npx -y supergateway --sse "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"
  */
 
 import express from 'express'
@@ -69,6 +69,28 @@ interface StdioToSseArgs {
   healthEndpoints: string[]
 }
 
+const onSignals = ({ logger }: { logger: Logger }) => {
+  process.on('SIGINT', () => {
+    logger.info('Caught SIGINT. Exiting...')
+    process.exit(0)
+  })
+
+  process.on('SIGTERM', () => {
+    logger.info('Caught SIGTERM. Exiting...')
+    process.exit(0)
+  })
+
+  process.on('SIGHUP', () => {
+    logger.info('Caught SIGHUP. Exiting...');
+    process.exit(0);
+  })
+
+  process.stdin.on('close', () => {
+    logger.info('stdin closed. Exiting...');
+    process.exit(0)
+  })
+}
+
 async function stdioToSse(args: StdioToSseArgs) {
   const {
     stdioCmd,
@@ -93,6 +115,8 @@ async function stdioToSse(args: StdioToSseArgs) {
 
   logger.info(`  - CORS enabled: ${enableCors}`)
   logger.info(`  - Health endpoints: ${healthEndpoints.length ? healthEndpoints.join(', ') : '(none)'}`)
+
+  onSignals({ logger })
 
   const child: ChildProcessWithoutNullStreams = spawn(stdioCmd, { shell: true })
   child.on('exit', (code, signal) => {
@@ -219,6 +243,8 @@ async function sseToStdio(args: SseToStdioArgs) {
   logger.info('Supergateway is supported by Superinterface - https://superinterface.ai')
   logger.info(`  - sse: ${sseUrl}`)
   logger.info('Connecting to SSE...')
+
+  onSignals({ logger })
 
   const sseTransport = new SSEClientTransport(new URL(sseUrl))
   const sseClient = new Client(

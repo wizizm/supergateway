@@ -18,7 +18,7 @@ npx -y supergateway --stdio "uvx mcp-server-git"
 - **`--baseUrl "http://localhost:8000"`**: Base URL for SSE clients (stdio to SSE mode; optional)
 - **`--ssePath "/sse"`**: Path for SSE subscriptions (stdio to SSE mode; default: `/sse`)
 - **`--messagePath "/message"`**: Path for SSE messages (stdio to SSE mode; default: `/message`)
-- **`--sse "https://mcp-server.supermachine.app"`**: SSE URL to connect to
+- **`--sse "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"`**: SSE URL to connect to
 - **`--logLevel info | none`**: Controls logging level (default: `info`). Use `none` to suppress all logs.
 - **`--cors`**: Enable CORS
 - **`--healthEndpoint /healthz`**: Register one or more endpoints (can be used multiple times) that respond with `"ok"`
@@ -35,7 +35,7 @@ Supergateway also supports running in **SSE to Stdio** mode. Instead of providin
 Example:
 
 ```bash
-npx -y supergateway --sse "https://mcp-server-example.supermachine.app"
+npx -y supergateway --sse "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"
 ```
 
 ## Example with MCP Inspector
@@ -66,23 +66,30 @@ ngrok then provides a public URL.
 
 ## Running with Docker
 
-This repository includes a Dockerfile for containerized deployments using Node 20. This lets you run Supergateway without managing local Node.js dependencies.
+A Docker-based workflow avoids local Node.js setup. A ready-to-run Docker image is available here:
+[supercorp/supergateway](https://hub.docker.com/r/supercorp/supergateway).
 
-**Build the Docker image:**
-
-```bash
-docker build -t supergateway .
-```
-
-**Run the Docker container:**
+### Using the Official Image
 
 ```bash
-docker run -it --rm -p 8000:8000 supergateway \
+docker run -it --rm -p 8000:8000 supercorp/supergateway \
     --stdio "npx -y @modelcontextprotocol/server-filesystem /" \
     --port 8000
 ```
 
-In this setup, the MCP server works on the container’s root directory (`/`). You can mount a host directory if needed.
+Docker will pull the image automatically if you don’t have it locally. The MCP server works on the container’s root directory (`/`), though you can mount a host directory if desired.
+
+### Building the Image Yourself
+
+Use the provided Dockerfile if you’d rather build it on your own:
+
+```bash
+docker build -t supergateway .
+
+docker run -it --rm -p 8000:8000 supergateway \
+    --stdio "npx -y @modelcontextprotocol/server-filesystem /" \
+    --port 8000
+```
 
 ## Using with Claude Desktop (SSE → Stdio Mode)
 
@@ -99,7 +106,7 @@ Claude Desktop can connect to Supergateway’s SSE endpoint when Supergateway is
         "-y",
         "supergateway",
         "--sse",
-        "https://mcp-server-example.supermachine.app"
+        "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"
       ]
     }
   }
@@ -117,9 +124,9 @@ Claude Desktop can connect to Supergateway’s SSE endpoint when Supergateway is
         "run",
         "-i",
         "--rm",
-        "supergateway",
+        "supercorp/supergateway",
         "--sse",
-        "https://mcp-server-example.supermachine.app"
+        "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"
       ]
     }
   }
