@@ -1,8 +1,8 @@
-![Supergateway: Run stdio MCP servers over SSE](https://raw.githubusercontent.com/supercorp-ai/supergateway/main/supergateway.png)
+![Supergateway: Run stdio MCP servers over SSE and WS](https://raw.githubusercontent.com/supercorp-ai/supergateway/main/supergateway.png)
 
-**Supergateway** runs a **MCP stdio-based servers** over **SSE (Server-Sent Events)** with one command. This is useful for remote access, debugging, or connecting to SSE-based clients when your MCP server only speaks stdio.
+**Supergateway** runs **MCP stdio-based servers** over **SSE (Server-Sent Events)** or **WebSockets (WS)** with one command. This is useful for remote access, debugging, or connecting to clients when your MCP server only supports stdio.
 
-Supported by [superinterface.ai](https://superinterface.ai), [supermachine.ai](https://supermachine.ai) and [supercorp.ai](https://supercorp.ai).
+Supported by [superinterface.ai](https://superinterface.ai), [supermachine.ai](https://supermachine.ai), and [supercorp.ai](https://supercorp.ai).
 
 ## Installation & Usage
 
@@ -12,62 +12,87 @@ Run Supergateway via `npx`:
 npx -y supergateway --stdio "uvx mcp-server-git"
 ```
 
-- **`--port 8000`**: Port to listen on (default: `8000`)
+- **`--port 8000`**: Port to listen on (stdio→SSE or stdio→WS mode, default: `8000`)
 - **`--stdio "command"`**: Command that runs an MCP server over stdio
-- **`--baseUrl "http://localhost:8000"`**: Base URL for SSE clients (stdio to SSE mode; optional)
-- **`--ssePath "/sse"`**: Path for SSE subscriptions (stdio to SSE mode; default: `/sse`)
-- **`--messagePath "/message"`**: Path for SSE messages (stdio to SSE mode; default: `/message`)
-- **`--sse "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"`**: SSE URL to connect to
-- **`--outputTransport stdio | sse | ws`**: Output MCP server transport. Default is `sse` when using `--stdio` and `stdio` when using `--sse`.
+- **`--baseUrl "http://localhost:8000"`**: Base URL for SSE or WS clients (stdio→SSE or stdio→WS mode; optional)
+- **`--ssePath "/sse"`**: Path for SSE subscriptions (stdio→SSE mode, default: `/sse`)
+- **`--messagePath "/message"`**: Path for messages (stdio→SSE or stdio→WS mode, default: `/message`)
+- **`--sse "https://example.supermachine.app"`**: SSE URL to connect to (SSE→stdio mode)
+- **`--outputTransport stdio | sse | ws`**: Output MCP transport (default: `sse` with `--stdio`, `stdio` with `--sse`)
 - **`--logLevel info | none`**: Controls logging level (default: `info`). Use `none` to suppress all logs.
-- **`--cors`**: Enable CORS
-- **`--healthEndpoint /healthz`**: Register one or more endpoints (can be used multiple times) that respond with `"ok"`
+- **`--cors`**: Enable CORS (stdio→SSE or stdio→WS mode)
+- **`--healthEndpoint /healthz`**: Register one or more endpoints (stdio→SSE or stdio→WS mode; can be used multiple times) that respond with `"ok"`
 
-Once started on SSE:
+## stdio → SSE
 
-- **SSE endpoint**: `GET http://localhost:8000/sse`
-- **POST messages**: `POST http://localhost:8000/message`
-
-## SSE to Stdio Mode
-
-Supergateway also supports running in **SSE to Stdio** mode. Instead of providing a `--stdio` command, specify the `--sse` flag with an SSE URL. In this mode, Supergateway connects to the remote SSE server and exposes a local stdio interface for downstream clients.
-
-Example:
+Expose an MCP stdio server as an SSE server:
 
 ```bash
-npx -y supergateway --sse "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"
+npx -y supergateway \
+    --stdio "npx -y @modelcontextprotocol/server-filesystem ./my-folder" \
+    --port 8000 --baseUrl http://localhost:8000 \
+    --ssePath /sse --messagePath /message
 ```
 
-## Example with MCP Inspector
+- **Subscribe to events**: `GET http://localhost:8000/sse`
+- **Send messages**: `POST http://localhost:8000/message`
+
+## SSE → stdio
+
+Connect to a remote SSE server and expose locally via stdio:
+
+```bash
+npx -y supergateway --sse "https://example.supermachine.app"
+```
+
+Useful for integrating remote SSE MCP servers into local command-line environments.
+
+## stdio → WS
+
+Expose an MCP stdio server as a WebSocket server:
+
+```bash
+npx -y supergateway \
+    --stdio "npx -y @modelcontextprotocol/server-filesystem ./my-folder" \
+    --port 8000 --outputTransport ws --messagePath /message
+```
+
+- **WebSocket endpoint**: `ws://localhost:8000/message`
+
+## Example with MCP Inspector (stdio → SSE mode)
 
 1. **Run Supergateway**:
-   ```bash
-   npx -y supergateway --port 8000 \
-       --stdio "npx -y @modelcontextprotocol/server-filesystem /Users/MyName/Desktop"
-   ```
+
+```bash
+npx -y supergateway --port 8000 \
+    --stdio "npx -y @modelcontextprotocol/server-filesystem /Users/MyName/Desktop"
+```
+
 2. **Use MCP Inspector**:
-   ```bash
-   npx @modelcontextprotocol/inspector --uri http://localhost:8000/sse
-   ```
-   You can then read resources, list tools, or run other MCP actions through Supergateway.
+
+```bash
+npx @modelcontextprotocol/inspector --uri http://localhost:8000/sse
+```
+
+You can now list tools, resources, or perform MCP actions via Supergateway.
 
 ## Using with ngrok
 
-You can use [ngrok](https://ngrok.com/) to share your local MCP server with remote clients:
+Use [ngrok](https://ngrok.com/) to share your local MCP server publicly:
 
 ```bash
 npx -y supergateway --port 8000 \
     --stdio "npx -y @modelcontextprotocol/server-filesystem ."
+
 # In another terminal:
 ngrok http 8000
 ```
 
-ngrok then provides a public URL.
+ngrok provides a public URL for remote access.
 
 ## Running with Docker
 
-A Docker-based workflow avoids local Node.js setup. A ready-to-run Docker image is available here:
-[supercorp/supergateway](https://hub.docker.com/r/supercorp/supergateway).
+Use Docker for an isolated setup. Official image available at [supercorp/supergateway](https://hub.docker.com/r/supercorp/supergateway):
 
 ### Using the Official Image
 
@@ -77,11 +102,11 @@ docker run -it --rm -p 8000:8000 supercorp/supergateway \
     --port 8000
 ```
 
-Docker will pull the image automatically if you don’t have it locally. The MCP server works on the container’s root directory (`/`), though you can mount a host directory if desired.
+Docker pulls the image automatically. The MCP server runs in the container’s root directory (`/`). You can mount host directories if needed.
 
 ### Building the Image Yourself
 
-Use the provided Dockerfile if you’d rather build it on your own:
+Use provided Dockerfile:
 
 ```bash
 docker build -t supergateway .
@@ -91,11 +116,11 @@ docker run -it --rm -p 8000:8000 supergateway \
     --port 8000
 ```
 
-## Using with Claude Desktop (SSE → Stdio Mode)
+## Using with Claude Desktop (SSE → stdio mode)
 
-Claude Desktop can connect to Supergateway’s SSE endpoint when Supergateway is running in SSE → Stdio mode.
+Claude Desktop can use Supergateway’s SSE→stdio mode.
 
-### NPX-Based MCP Server Example
+### NPX-based MCP Server Example
 
 ```json
 {
@@ -106,14 +131,14 @@ Claude Desktop can connect to Supergateway’s SSE endpoint when Supergateway is
         "-y",
         "supergateway",
         "--sse",
-        "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"
+        "https://example.supermachine.app"
       ]
     }
   }
 }
 ```
 
-### Docker-Based MCP Server Example
+### Docker-based MCP Server Example
 
 ```json
 {
@@ -126,7 +151,7 @@ Claude Desktop can connect to Supergateway’s SSE endpoint when Supergateway is
         "--rm",
         "supercorp/supergateway",
         "--sse",
-        "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"
+        "https://example.supermachine.app"
       ]
     }
   }
@@ -135,19 +160,19 @@ Claude Desktop can connect to Supergateway’s SSE endpoint when Supergateway is
 
 ## Why MCP?
 
-[Model Context Protocol](https://spec.modelcontextprotocol.io/) standardizes how AI tools exchange data. If your MCP server only speaks stdio, Supergateway exposes an SSE-based interface so remote clients (and tools like MCP Inspector or Claude Desktop) can connect without extra server changes.
+[Model Context Protocol](https://spec.modelcontextprotocol.io/) standardizes AI tool interactions. Supergateway converts MCP stdio servers into SSE or WS services, simplifying integration and debugging with web-based or remote clients.
 
 ## Advanced Configuration
 
-Supergateway is designed with modularity in mind:
+Supergateway emphasizes modularity:
 
-- It automatically derives the JSON‑RPC version from incoming requests, ensuring future compatibility.
-- Package information (name and version) is retransmitted where possible.
-- Stdio-to-SSE mode uses standard logs and SSE-to-Stdio mode logs via stderr (as otherwise it would prevent stdio functionality).
+- Automatically manages JSON-RPC versioning.
+- Retransmits package metadata where possible.
+- stdio→SSE or stdio→WS mode logs via standard output; SSE→stdio mode logs via stderr.
 
 ## Contributing
 
-Issues and PRs are welcome. Please open one if you have ideas or encounter any problems.
+Issues and PRs welcome. Please open one if you encounter problems or have feature suggestions.
 
 ## License
 
