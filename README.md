@@ -14,17 +14,17 @@ npx -y supergateway --stdio "uvx mcp-server-git"
 
 - **`--port 8000`**: Port to listen on (default: `8000`)
 - **`--stdio "command"`**: Command that runs an MCP server over stdio
-- **`--ws`**: Can be used along with `--stdio` to expose a WebSocket endpoint for MCP clients instead of SSE.
 - **`--baseUrl "http://localhost:8000"`**: Base URL for SSE clients (stdio to SSE mode; optional)
 - **`--ssePath "/sse"`**: Path for SSE subscriptions (stdio to SSE mode; default: `/sse`)
 - **`--messagePath "/message"`**: Path for SSE messages (stdio to SSE mode; default: `/message`)
 - **`--sse "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"`**: SSE URL to connect to
+- **`--outputTransport stdio | sse | ws`**: Output MCP server transport. Default is `sse` when using `--stdio` and `stdio` when using `--sse`.
 - **`--logLevel info | none`**: Controls logging level (default: `info`). Use `none` to suppress all logs.
 - **`--cors`**: Enable CORS
 - **`--healthEndpoint /healthz`**: Register one or more endpoints (can be used multiple times) that respond with `"ok"`
-- **`--healthPort 8080`**: Port to run health endpoints on (default: `8080`). Used only if `--healthEndpoint` is provided and `--stdio --ws` is also provided.
 
 Once started on SSE:
+
 - **SSE endpoint**: `GET http://localhost:8000/sse`
 - **POST messages**: `POST http://localhost:8000/message`
 
@@ -140,6 +140,7 @@ Claude Desktop can connect to Supergateway’s SSE endpoint when Supergateway is
 ## Advanced Configuration
 
 Supergateway is designed with modularity in mind:
+
 - It automatically derives the JSON‑RPC version from incoming requests, ensuring future compatibility.
 - Package information (name and version) is retransmitted where possible.
 - Stdio-to-SSE mode uses standard logs and SSE-to-Stdio mode logs via stderr (as otherwise it would prevent stdio functionality).

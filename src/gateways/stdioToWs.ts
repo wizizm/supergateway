@@ -16,7 +16,6 @@ export interface StdioToWsArgs {
   logger: Logger
   enableCors: boolean
   healthEndpoints: string[]
-  healthPort: number
 }
 
 export async function stdioToWs(args: StdioToWsArgs) {
@@ -27,7 +26,6 @@ export async function stdioToWs(args: StdioToWsArgs) {
     messagePath,
     logger,
     healthEndpoints,
-    healthPort,
     enableCors,
   } = args
   const hostname = baseUrl ? new URL(baseUrl).hostname : '0.0.0.0'
@@ -43,7 +41,6 @@ export async function stdioToWs(args: StdioToWsArgs) {
   let child: ChildProcessWithoutNullStreams | null = null
   let isReady = false
 
-  // Cleanup function
   const cleanup = () => {
     if (wsTransport) {
       wsTransport.close().catch((err) => {
@@ -55,7 +52,6 @@ export async function stdioToWs(args: StdioToWsArgs) {
     }
   }
 
-  // Set up signal handlers
   onSignals({
     logger,
     cleanup,
@@ -78,8 +74,8 @@ export async function stdioToWs(args: StdioToWsArgs) {
         }
       })
     }
-    app.listen(healthPort, hostname, () => {
-      logger.info(`Health check endpoint listening on port ${healthPort}`)
+    app.listen(port, hostname, () => {
+      logger.info(`Health endpoints listening on ${port}`)
     })
   }
 

@@ -46,7 +46,6 @@ export async function stdioToSse(args: StdioToSseArgs) {
     `  - Health endpoints: ${healthEndpoints.length ? healthEndpoints.join(', ') : '(none)'}`,
   )
 
-  // Set up signal handlers
   onSignals({ logger })
 
   const child: ChildProcessWithoutNullStreams = spawn(stdioCmd, { shell: true })

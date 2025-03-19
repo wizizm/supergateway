@@ -23,7 +23,6 @@ export async function sseToStdio(args: SseToStdioArgs) {
   logger.info(`  - sse: ${sseUrl}`)
   logger.info('Connecting to SSE...')
 
-  // Set up signal handlers
   onSignals({ logger })
 
   const sseTransport = new SSEClientTransport(new URL(sseUrl))

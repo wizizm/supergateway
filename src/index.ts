@@ -2,17 +2,17 @@
 /**
  * index.ts
  *
- * Run MCP stdio servers over SSE and SSE over stdio.
+ * Run MCP stdio servers over SSE, convert between stdio, SSE, WS.
  *
  * Usage:
- *   # stdio -> SSE
+ *   # stdio→SSE
  *   npx -y supergateway --stdio "npx -y @modelcontextprotocol/server-filesystem /" \
  *                       --port 8000 --baseUrl http://localhost:8000 --ssePath /sse --messagePath /message
  *
- *   # SSE -> stdio
+ *   # SSE→stdio
  *   npx -y supergateway --sse "https://mcp-server-715510c7-0eb2-4b71-8d90-b49871f202dc.supermachine.app"
  *
- *   # stdio -> WS
+ *   # stdio→WS
  *   npx -y supergateway --stdio "npx -y @modelcontextprotocol/server-filesystem /" --outputTransport ws
  */
 
@@ -71,17 +71,17 @@ async function main() {
         return undefined
       },
       description:
-        'Transport for output messages. Default is "sse" when using --stdio and "stdio" when using --sse.',
+        'Transport for output. Default is "sse" when using --stdio and "stdio" when using --sse.',
     })
     .option('port', {
       type: 'number',
       default: 8000,
-      description: '(stdio→SSE or stdio→WS) Port to run on',
+      description: '(stdio→SSE, stdio→WS) Port for output MCP server',
     })
     .option('baseUrl', {
       type: 'string',
       default: '',
-      description: '(stdio→SSE or stdio→WS) Base URL for SSE or WS server',
+      description: '(stdio→SSE, stdio→WS) Base URL for output MCP server',
     })
     .option('ssePath', {
       type: 'string',
@@ -91,8 +91,7 @@ async function main() {
     .option('messagePath', {
       type: 'string',
       default: '/message',
-      description:
-        '(stdio→SSE) Path for SSE messages. (stdio→WS) Path for WebSocket messages.',
+      description: '(stdio→SSE, stdio→WS) Path for messages',
     })
     .option('logLevel', {
       choices: ['info', 'none'] as const,
@@ -109,11 +108,6 @@ async function main() {
       default: [],
       description:
         'One or more endpoints returning "ok", e.g. --healthEndpoint /healthz --healthEndpoint /readyz',
-    })
-    .option('healthPort', {
-      type: 'number',
-      default: 8080,
-      description: 'Port to run health endpoints on',
     })
     .help()
     .parseSync()
@@ -162,7 +156,6 @@ async function main() {
           logger,
           enableCors: argv.cors,
           healthEndpoints: argv.healthEndpoint as string[],
-          healthPort: argv.healthPort,
         })
       } else {
         logStderr(`Error: stdio→${argv.outputTransport} not supported`)
