@@ -1,5 +1,6 @@
 import express from 'express'
 import cors from 'cors'
+import { createServer } from 'http'
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process'
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js'
@@ -121,12 +122,23 @@ export async function stdioToWs(args: StdioToWsArgs) {
       logger.info(`Child stderr: ${chunk.toString('utf8')}`)
     })
 
-    wsTransport = new WebSocketServerTransport(
-      hostname,
-      port,
-      messagePath,
-      enableCors,
-    )
+    const app = express()
+
+    if (enableCors) {
+      app.use(cors())
+    }
+
+    for (const ep of healthEndpoints) {
+      app.get(ep, (_req, res) => {
+        res.send('ok')
+      })
+    }
+
+    wsTransport = new WebSocketServerTransport({
+      path: messagePath,
+      server: createServer(app),
+    })
+
     await server.connect(wsTransport)
 
     wsTransport.onmessage = (msg: JSONRPCMessage) => {

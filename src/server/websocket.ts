@@ -2,14 +2,9 @@ import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 import { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js'
 import { v4 as uuidv4 } from 'uuid'
 import { WebSocket, WebSocketServer } from 'ws'
+import { Server } from 'http'
 
-/**
- * Server transport for WebSocket: this will create a WebSocket server that clients can connect to.
- */
 export class WebSocketServerTransport implements Transport {
-  private host: string
-  private port: number
-  private path: string
   private wss!: WebSocketServer
   private clients: Map<string, WebSocket> = new Map()
 
@@ -37,36 +32,11 @@ export class WebSocketServerTransport implements Transport {
       : undefined
   }
 
-  constructor(host: string, port: number, path: string, enableCors: boolean) {
-    this.host = host || '0.0.0.0'
-    this.port = port || 8080
-    this.path = path || '/ws'
+  constructor({ path, server }: { path: string; server: Server }) {
     this.wss = new WebSocketServer({
-      host: this.host,
-      port: this.port,
-      path: this.path,
+      path,
+      server,
     })
-    if (enableCors) {
-      this.wss.on('upgrade', (request, socket, head) => {
-        if (request.headers.origin) {
-          const origin = request.headers.origin
-          if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
-            socket.write(
-              'HTTP/1.1 200 OK\r\n' +
-                'Access-Control-Allow-Origin: ' +
-                origin +
-                '\r\n' +
-                'Access-Control-Allow-Credentials: true\r\n' +
-                'Connection: keep-alive\r\n' +
-                'Content-Length: 0\r\n' +
-                'Keep-Alive: timeout=5\r\n' +
-                'Content-Type: text/plain\r\n' +
-                '\r\n',
-            )
-          }
-        }
-      })
-    }
   }
 
   async start(): Promise<void> {
