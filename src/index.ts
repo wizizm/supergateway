@@ -81,7 +81,7 @@ async function main() {
     .option('baseUrl', {
       type: 'string',
       default: '',
-      description: '(stdio→SSE, stdio→WS) Base URL for output MCP server',
+      description: '(stdio→SSE) Base URL for output MCP server',
     })
     .option('ssePath', {
       type: 'string',
@@ -151,7 +151,6 @@ async function main() {
         await stdioToWs({
           stdioCmd: argv.stdio!,
           port: argv.port,
-          baseUrl: argv.baseUrl,
           messagePath: argv.messagePath,
           logger,
           enableCors: argv.cors,

@@ -12,7 +12,6 @@ import { onSignals } from '../lib/onSignals.js'
 export interface StdioToWsArgs {
   stdioCmd: string
   port: number
-  baseUrl: string
   messagePath: string
   logger: Logger
   enableCors: boolean
@@ -20,22 +19,10 @@ export interface StdioToWsArgs {
 }
 
 export async function stdioToWs(args: StdioToWsArgs) {
-  const {
-    stdioCmd,
-    port,
-    baseUrl,
-    messagePath,
-    logger,
-    healthEndpoints,
-    enableCors,
-  } = args
-  const hostname = baseUrl ? new URL(baseUrl).hostname : '0.0.0.0'
-
+  const { stdioCmd, port, messagePath, logger, healthEndpoints, enableCors } =
+    args
   logger.info(`  - port: ${port}`)
   logger.info(`  - stdio: ${stdioCmd}`)
-  if (baseUrl) {
-    logger.info(`  - baseUrl: ${baseUrl}`)
-  }
   logger.info(`  - messagePath: ${messagePath}`)
   logger.info(`  - CORS enabled: ${enableCors}`)
   logger.info(
@@ -61,28 +48,6 @@ export async function stdioToWs(args: StdioToWsArgs) {
     logger,
     cleanup,
   })
-
-  if (healthEndpoints.length > 0) {
-    const app = express()
-    if (enableCors) {
-      app.use(cors())
-    }
-    for (const ep of healthEndpoints) {
-      app.get(ep, (_req: express.Request, res: express.Response) => {
-        if (child?.killed) {
-          res.status(500).send('Child process has been killed')
-        }
-        if (!isReady) {
-          res.status(500).send('Server is not ready')
-        } else {
-          res.send('ok')
-        }
-      })
-    }
-    app.listen(port, hostname, () => {
-      logger.info(`Health endpoints listening on ${port}`)
-    })
-  }
 
   try {
     child = spawn(stdioCmd, { shell: true })
@@ -130,13 +95,23 @@ export async function stdioToWs(args: StdioToWsArgs) {
 
     for (const ep of healthEndpoints) {
       app.get(ep, (_req, res) => {
+        if (child?.killed) {
+          res.status(500).send('Child process has been killed')
+        }
+
+        if (!isReady) {
+          res.status(500).send('Server is not ready')
+        }
+
         res.send('ok')
       })
     }
 
+    const httpServer = createServer(app)
+
     wsTransport = new WebSocketServerTransport({
       path: messagePath,
-      server: createServer(app),
+      server: httpServer,
     })
 
     await server.connect(wsTransport)
@@ -160,8 +135,11 @@ export async function stdioToWs(args: StdioToWsArgs) {
     }
 
     isReady = true
-    const wsEndpoint = `ws://${hostname}:${port}${messagePath}`
-    logger.info(`WebSocket endpoint: ${wsEndpoint}`)
+
+    httpServer.listen(port, () => {
+      logger.info(`Listening on port ${port}`)
+      logger.info(`WebSocket endpoint: ws://localhost:${port}${messagePath}`)
+    })
   } catch (err: any) {
     logger.error(`Failed to start: ${err.message}`)
     cleanup()
