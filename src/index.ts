@@ -10,7 +10,7 @@
  *                       --port 8000 --baseUrl http://localhost:8000 --ssePath /sse --messagePath /message
  *
  *   # SSE→stdio
- *   npx -y supergateway --sse "https://mcp-server-715510c7-0eb2-4b71-8d90-b49871f202dc.supermachine.app"
+ *   npx -y supergateway --sse "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"
  *
  *   # stdio→WS
  *   npx -y supergateway --stdio "npx -y @modelcontextprotocol/server-filesystem /" --outputTransport ws
