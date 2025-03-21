@@ -65,7 +65,7 @@ ngrok then provides a public URL.
 ## Running with Docker
 
 A Docker-based workflow avoids local Node.js setup. A ready-to-run Docker image is available here:
-[supercorp/supergateway](https://hub.docker.com/r/supercorp/supergateway).
+[supercorp/supergateway](https://hub.docker.com/r/supercorp/supergateway). Also on GHCR: [ghcr.io/supercorp-ai/supergateway](https://github.com/supercorp-ai/supergateway/pkgs/container/supergateway)
 
 ### Using the Official Image
 
