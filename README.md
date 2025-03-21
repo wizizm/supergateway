@@ -12,10 +12,10 @@ Run Supergateway via `npx`:
 npx -y supergateway --stdio "uvx mcp-server-git"
 ```
 
-- **`--port 8000`**: Port to listen on (stdio→SSE or stdio→WS mode, default: `8000`)
 - **`--stdio "command"`**: Command that runs an MCP server over stdio
 - **`--sse "https://example.supermachine.app"`**: SSE URL to connect to (SSE→stdio mode)
 - **`--outputTransport stdio | sse | ws`**: Output MCP transport (default: `sse` with `--stdio`, `stdio` with `--sse`)
+- **`--port 8000`**: Port to listen on (stdio→SSE or stdio→WS mode, default: `8000`)
 - **`--baseUrl "http://localhost:8000"`**: Base URL for SSE or WS clients (stdio→SSE mode; optional)
 - **`--ssePath "/sse"`**: Path for SSE subscriptions (stdio→SSE mode, default: `/sse`)
 - **`--messagePath "/message"`**: Path for messages (stdio→SSE or stdio→WS mode, default: `/message`)
