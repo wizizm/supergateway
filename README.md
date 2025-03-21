@@ -13,7 +13,7 @@ npx -y supergateway --stdio "uvx mcp-server-git"
 ```
 
 - **`--stdio "command"`**: Command that runs an MCP server over stdio
-- **`--sse "https://example.supermachine.app"`**: SSE URL to connect to (SSE→stdio mode)
+- **`--sse "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"`**: SSE URL to connect to (SSE→stdio mode)
 - **`--outputTransport stdio | sse | ws`**: Output MCP transport (default: `sse` with `--stdio`, `stdio` with `--sse`)
 - **`--port 8000`**: Port to listen on (stdio→SSE or stdio→WS mode, default: `8000`)
 - **`--baseUrl "http://localhost:8000"`**: Base URL for SSE or WS clients (stdio→SSE mode; optional)
@@ -42,7 +42,7 @@ npx -y supergateway \
 Connect to a remote SSE server and expose locally via stdio:
 
 ```bash
-npx -y supergateway --sse "https://example.supermachine.app"
+npx -y supergateway --sse "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"
 ```
 
 Useful for integrating remote SSE MCP servers into local command-line environments.
@@ -132,7 +132,7 @@ Claude Desktop can use Supergateway’s SSE→stdio mode.
         "-y",
         "supergateway",
         "--sse",
-        "https://example.supermachine.app"
+        "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"
       ]
     }
   }
@@ -152,7 +152,7 @@ Claude Desktop can use Supergateway’s SSE→stdio mode.
         "--rm",
         "supercorp/supergateway",
         "--sse",
-        "https://example.supermachine.app"
+        "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"
       ]
     }
   }
@@ -173,6 +173,7 @@ Supergateway emphasizes modularity:
 
 ## Contributors
 
+- [@Joffref](https://github.com/Joffref)
 - [@michaeljguarino](https://github.com/michaeljguarino)
 
 ## Contributing
