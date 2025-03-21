@@ -92,7 +92,8 @@ ngrok provides a public URL for remote access.
 
 ## Running with Docker
 
-Use Docker for an isolated setup. Official image available at [supercorp/supergateway](https://hub.docker.com/r/supercorp/supergateway):
+A Docker-based workflow avoids local Node.js setup. A ready-to-run Docker image is available here:
+[supercorp/supergateway](https://hub.docker.com/r/supercorp/supergateway). Also on GHCR: [ghcr.io/supercorp-ai/supergateway](https://github.com/supercorp-ai/supergateway/pkgs/container/supergateway)
 
 ### Using the Official Image
 
@@ -169,6 +170,10 @@ Supergateway emphasizes modularity:
 - Automatically manages JSON-RPC versioning.
 - Retransmits package metadata where possible.
 - stdio→SSE or stdio→WS mode logs via standard output; SSE→stdio mode logs via stderr.
+
+## Contributors
+
+- [@michaeljguarino](https://github.com/michaeljguarino)
 
 ## Contributing
 
