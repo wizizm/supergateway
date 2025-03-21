@@ -130,7 +130,7 @@ async function main() {
 
   logger.info('Starting...')
   logger.info(
-    'Supergateway is supported by Superinterface - https://superinterface.ai',
+    'Supergateway is supported by Supermachine (hosted MCPs) - https://supermachine.ai',
   )
   logger.info(`  - outputTransport: ${argv.outputTransport}`)
 
