@@ -142,6 +142,10 @@ Supergateway is designed with modularity in mind:
 - Package information (name and version) is retransmitted where possible.
 - Stdio-to-SSE mode uses standard logs and SSE-to-Stdio mode logs via stderr (as otherwise it would prevent stdio functionality).
 
+## Contributors
+
+- [@michaeljguarino](https://github.com/michaeljguarino)
+
 ## Contributing
 
 Issues and PRs are welcome. Please open one if you have ideas or encounter any problems.
