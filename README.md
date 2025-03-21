@@ -71,7 +71,7 @@ npx -y supergateway --port 8000 \
 2. **Use MCP Inspector**:
 
 ```bash
-npx @modelcontextprotocol/inspector --uri http://localhost:8000/sse
+npx @modelcontextprotocol/inspector
 ```
 
 You can now list tools, resources, or perform MCP actions via Supergateway.
