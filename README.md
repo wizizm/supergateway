@@ -171,6 +171,10 @@ Supergateway emphasizes modularity:
 - Retransmits package metadata where possible.
 - stdio→SSE or stdio→WS mode logs via standard output; SSE→stdio mode logs via stderr.
 
+## Additional resources
+
+- [Superargs](https://github.com/supercorp-ai/superargs) - provide arguments to MCP servers during runtime.
+
 ## Contributors
 
 - [@Joffref](https://github.com/Joffref)
