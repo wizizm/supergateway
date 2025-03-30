@@ -34,16 +34,6 @@ npx -y supergateway \
     --ssePath /sse --messagePath /message
 ```
 
-You can also pass header(s) when sending requests. This is useful for Auth:
-
-```bash
-npx -y supergateway \
-    --stdio "npx -y @modelcontextprotocol/server-filesystem ./my-folder" \
-    --port 8000 --baseUrl http://localhost:8000 \
-    --ssePath /sse --messagePath /message \
-    --header "Authorization: Bearer <token>"
-```
-
 - **Subscribe to events**: `GET http://localhost:8000/sse`
 - **Send messages**: `POST http://localhost:8000/message`
 
@@ -56,6 +46,15 @@ npx -y supergateway --sse "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956
 ```
 
 Useful for integrating remote SSE MCP servers into local command-line environments.
+
+You can also pass headers when sending requests. This is useful for authentication:
+
+```bash
+npx -y supergateway \
+    --sse "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app" \
+    --header "Authorization: Bearer some-token" \
+    --header "X-My-Header: another-value"
+```
 
 ## stdio → WS
 
@@ -187,6 +186,7 @@ Supergateway emphasizes modularity:
 
 ## Contributors
 
+- [@Areo-Joe](https://github.com/Areo-Joe)
 - [@Joffref](https://github.com/Joffref)
 - [@michaeljguarino](https://github.com/michaeljguarino)
 
