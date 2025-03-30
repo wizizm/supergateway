@@ -22,6 +22,9 @@ export async function sseToStdio(args: SseToStdioArgs) {
   const headers = buildHeaders(_headers, logger)
 
   logger.info(`  - sse: ${sseUrl}`)
+  logger.info(
+    `  - Headers: ${_headers.length ? JSON.stringify(_headers) : '(none)'}`,
+  )
   logger.info('Connecting to SSE...')
 
   onSignals({ logger })
