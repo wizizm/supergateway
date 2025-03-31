@@ -19,6 +19,7 @@ npx -y supergateway --stdio "uvx mcp-server-git"
 - **`--baseUrl "http://localhost:8000"`**: Base URL for SSE or WS clients (stdio→SSE mode; optional)
 - **`--ssePath "/sse"`**: Path for SSE subscriptions (stdio→SSE mode, default: `/sse`)
 - **`--messagePath "/message"`**: Path for messages (stdio→SSE or stdio→WS mode, default: `/message`)
+- **`--header "Authorization: Bearer 123"`**: Send one or more headers (SSE→stdio mode; can be used multiple times)
 - **`--logLevel info | none`**: Controls logging level (default: `info`). Use `none` to suppress all logs.
 - **`--cors`**: Enable CORS (stdio→SSE or stdio→WS mode)
 - **`--healthEndpoint /healthz`**: Register one or more endpoints (stdio→SSE or stdio→WS mode; can be used multiple times) that respond with `"ok"`
@@ -46,6 +47,15 @@ npx -y supergateway --sse "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956
 ```
 
 Useful for integrating remote SSE MCP servers into local command-line environments.
+
+You can also pass headers when sending requests. This is useful for authentication:
+
+```bash
+npx -y supergateway \
+    --sse "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app" \
+    --header "Authorization: Bearer some-token" \
+    --header "X-My-Header: another-value"
+```
 
 ## stdio → WS
 
@@ -177,6 +187,7 @@ Supergateway emphasizes modularity:
 
 ## Contributors
 
+- [@Areo-Joe](https://github.com/Areo-Joe)
 - [@Joffref](https://github.com/Joffref)
 - [@michaeljguarino](https://github.com/michaeljguarino)
 
