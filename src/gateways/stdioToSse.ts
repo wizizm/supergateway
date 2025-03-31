@@ -83,7 +83,6 @@ export async function stdioToSse(args: StdioToSseArgs) {
   app.get(ssePath, async (req, res) => {
     logger.info(`New SSE connection from ${req.ip}`)
 
-    // Set custom headers
     res.setHeader('X-Accel-Buffering', 'no')
 
     const sseTransport = new SSEServerTransport(`${baseUrl}${messagePath}`, res)
