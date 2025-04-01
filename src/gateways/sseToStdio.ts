@@ -10,6 +10,7 @@ import { z } from 'zod'
 import { getVersion } from '../lib/getVersion.js'
 import { Logger } from '../types.js'
 import { onSignals } from '../lib/onSignals.js'
+import { parseHeaders } from '../utils/headerUtils.js'
 
 export interface SseToStdioArgs {
   sseUrl: string
@@ -18,12 +19,12 @@ export interface SseToStdioArgs {
 }
 
 export async function sseToStdio(args: SseToStdioArgs) {
-  const { sseUrl, logger, headers: _headers = [] } = args
-  const headers = buildHeaders(_headers, logger)
+  const { sseUrl, logger, headers: cliHeaders = [] } = args
+  const headers = parseHeaders(cliHeaders, logger)
 
   logger.info(`  - sse: ${sseUrl}`)
   logger.info(
-    `  - Headers: ${_headers.length ? JSON.stringify(_headers) : '(none)'}`,
+    `  - Headers: ${cliHeaders.length ? JSON.stringify(cliHeaders) : '(none)'}`,
   )
   logger.info('Connecting to SSE...')
 
@@ -119,25 +120,4 @@ export async function sseToStdio(args: SseToStdioArgs) {
   }
 
   logger.info('Stdio server listening')
-}
-
-function buildHeaders(
-  headers: string[],
-  logger: Logger,
-): Record<string, string> {
-  return headers.reduce<Record<string, string>>((acc, header) => {
-    const colonIndex = header.indexOf(':')
-    if (colonIndex === -1) {
-      logger.error(`Invalid header format: ${header}, ignoring`)
-      return acc
-    }
-    const key = header.slice(0, colonIndex).trim()
-    const value = header.slice(colonIndex + 1).trim()
-    if (!key || !value) {
-      logger.error(`Invalid header format: ${header}, ignoring`)
-      return acc
-    }
-    acc[key] = value
-    return acc
-  }, {})
 }

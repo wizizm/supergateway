@@ -8,6 +8,7 @@ import { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js'
 import { Logger } from '../types.js'
 import { getVersion } from '../lib/getVersion.js'
 import { onSignals } from '../lib/onSignals.js'
+import { parseHeaders } from '../utils/headerUtils.js'
 
 export interface StdioToSseArgs {
   stdioCmd: string
@@ -18,6 +19,7 @@ export interface StdioToSseArgs {
   logger: Logger
   enableCors: boolean
   healthEndpoints: string[]
+  cliHeaders?: string[]
 }
 
 export async function stdioToSse(args: StdioToSseArgs) {
@@ -30,8 +32,14 @@ export async function stdioToSse(args: StdioToSseArgs) {
     logger,
     enableCors,
     healthEndpoints,
+    cliHeaders = [],
   } = args
 
+  const headers = parseHeaders(cliHeaders, logger)
+
+  logger.info(
+    `  - Headers: ${cliHeaders.length ? JSON.stringify(cliHeaders) : '(none)'}`,
+  )
   logger.info(`  - port: ${port}`)
   logger.info(`  - stdio: ${stdioCmd}`)
   if (baseUrl) {
@@ -76,6 +84,7 @@ export async function stdioToSse(args: StdioToSseArgs) {
 
   for (const ep of healthEndpoints) {
     app.get(ep, (_req, res) => {
+      setResponseHeaders(res)
       res.send('ok')
     })
   }
@@ -83,7 +92,7 @@ export async function stdioToSse(args: StdioToSseArgs) {
   app.get(ssePath, async (req, res) => {
     logger.info(`New SSE connection from ${req.ip}`)
 
-    res.setHeader('X-Accel-Buffering', 'no')
+    setResponseHeaders(res)
 
     const sseTransport = new SSEServerTransport(`${baseUrl}${messagePath}`, res)
     await server.connect(sseTransport)
@@ -117,6 +126,8 @@ export async function stdioToSse(args: StdioToSseArgs) {
   // @ts-ignore
   app.post(messagePath, async (req, res) => {
     const sessionId = req.query.sessionId as string
+    setResponseHeaders(res)
+
     if (!sessionId) {
       return res.status(400).send('Missing sessionId parameter')
     }
@@ -163,4 +174,10 @@ export async function stdioToSse(args: StdioToSseArgs) {
   child.stderr.on('data', (chunk: Buffer) => {
     logger.error(`Child stderr: ${chunk.toString('utf8')}`)
   })
+
+  function setResponseHeaders(res: express.Response) {
+    Object.entries(headers).forEach(([key, value]) => {
+      res.setHeader(key, value)
+    })
+  }
 }
