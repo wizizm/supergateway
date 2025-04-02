@@ -152,6 +152,7 @@ async function main() {
           logger,
           enableCors: argv.cors,
           healthEndpoints: argv.healthEndpoint as string[],
+          cliHeaders: argv.header as string[],
         })
       } else if (argv.outputTransport === 'ws') {
         await stdioToWs({
