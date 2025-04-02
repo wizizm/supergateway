@@ -19,7 +19,7 @@ npx -y supergateway --stdio "uvx mcp-server-git"
 - **`--baseUrl "http://localhost:8000"`**: Base URL for SSE or WS clients (stdio→SSE mode; optional)
 - **`--ssePath "/sse"`**: Path for SSE subscriptions (stdio→SSE mode, default: `/sse`)
 - **`--messagePath "/message"`**: Path for messages (stdio→SSE or stdio→WS mode, default: `/message`)
-- **`--header "Authorization: Bearer 123"`**: Send one or more headers (SSE→stdio mode; can be used multiple times)
+- **`--header "Authorization: Bearer 123"`**: Add one or more headers (stdio→SSE or SSE→stdio mode; can be used multiple times)
 - **`--logLevel info | none`**: Controls logging level (default: `info`). Use `none` to suppress all logs.
 - **`--cors`**: Enable CORS (stdio→SSE or stdio→WS mode)
 - **`--healthEndpoint /healthz`**: Register one or more endpoints (stdio→SSE or stdio→WS mode; can be used multiple times) that respond with `"ok"`
@@ -187,6 +187,7 @@ Supergateway emphasizes modularity:
 
 ## Contributors
 
+- [@pcnfernando](https://github.com/pcnfernando)
 - [@Areo-Joe](https://github.com/Areo-Joe)
 - [@Joffref](https://github.com/Joffref)
 - [@michaeljguarino](https://github.com/michaeljguarino)
