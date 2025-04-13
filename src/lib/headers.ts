@@ -44,11 +44,6 @@ export const headers = ({
     logger,
   })
 
-  console.log({
-    argv,
-    headers,
-  })
-
   if ('oauth2Bearer' in argv) {
     return {
       ...headers,
