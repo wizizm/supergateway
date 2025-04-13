@@ -8,7 +8,6 @@ import { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js'
 import { Logger } from '../types.js'
 import { getVersion } from '../lib/getVersion.js'
 import { onSignals } from '../lib/onSignals.js'
-import { parseHeaders } from '../lib/parseHeaders.js'
 
 export interface StdioToSseArgs {
   stdioCmd: string
@@ -19,7 +18,7 @@ export interface StdioToSseArgs {
   logger: Logger
   enableCors: boolean
   healthEndpoints: string[]
-  cliHeaders?: string[]
+  headers: Record<string, string>
 }
 
 const setResponseHeaders = ({
@@ -43,13 +42,11 @@ export async function stdioToSse(args: StdioToSseArgs) {
     logger,
     enableCors,
     healthEndpoints,
-    cliHeaders = [],
+    headers,
   } = args
 
-  const headers = parseHeaders(cliHeaders, logger)
-
   logger.info(
-    `  - Headers: ${cliHeaders.length ? JSON.stringify(cliHeaders) : '(none)'}`,
+    `  - Headers: ${Object(headers).length ? JSON.stringify(headers) : '(none)'}`,
   )
   logger.info(`  - port: ${port}`)
   logger.info(`  - stdio: ${stdioCmd}`)

@@ -10,21 +10,19 @@ import { z } from 'zod'
 import { getVersion } from '../lib/getVersion.js'
 import { Logger } from '../types.js'
 import { onSignals } from '../lib/onSignals.js'
-import { parseHeaders } from '../lib/parseHeaders.js'
 
 export interface SseToStdioArgs {
   sseUrl: string
   logger: Logger
-  headers?: string[]
+  headers: Record<string, string>
 }
 
 export async function sseToStdio(args: SseToStdioArgs) {
-  const { sseUrl, logger, headers: cliHeaders = [] } = args
-  const headers = parseHeaders(cliHeaders, logger)
+  const { sseUrl, logger, headers } = args
 
   logger.info(`  - sse: ${sseUrl}`)
   logger.info(
-    `  - Headers: ${cliHeaders.length ? JSON.stringify(cliHeaders) : '(none)'}`,
+    `  - Headers: ${Object.keys(headers).length ? JSON.stringify(headers) : '(none)'}`,
   )
   logger.info('Connecting to SSE...')
 
