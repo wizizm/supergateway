@@ -23,6 +23,7 @@ import { stdioToSse } from './gateways/stdioToSse.js'
 import { sseToStdio } from './gateways/sseToStdio.js'
 import { stdioToWs } from './gateways/stdioToWs.js'
 import { headers } from './lib/headers.js'
+import { corsOrigin } from './lib/corsOrigin.js'
 
 const log = (...args: any[]) => console.log('[supergateway]', ...args)
 const logStderr = (...args: any[]) => console.error('[supergateway]', ...args)
@@ -100,9 +101,9 @@ async function main() {
       description: 'Logging level',
     })
     .option('cors', {
-      type: 'boolean',
-      default: false,
-      description: 'Enable CORS',
+      type: 'array',
+      description:
+        'Enable CORS. Use --cors with no values to allow all origins, or supply one or more allowed origins (e.g. --cors "http://example.com" or --cors "/example\\.com$/" for regex matching).',
     })
     .option('healthEndpoint', {
       type: 'array',
@@ -156,7 +157,7 @@ async function main() {
           ssePath: argv.ssePath,
           messagePath: argv.messagePath,
           logger,
-          enableCors: argv.cors,
+          corsOrigin: corsOrigin({ argv }),
           healthEndpoints: argv.healthEndpoint as string[],
           headers: headers({
             argv,
@@ -169,7 +170,7 @@ async function main() {
           port: argv.port,
           messagePath: argv.messagePath,
           logger,
-          enableCors: argv.cors,
+          corsOrigin: corsOrigin({ argv }),
           healthEndpoints: argv.healthEndpoint as string[],
         })
       } else {

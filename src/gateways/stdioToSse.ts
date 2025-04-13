@@ -1,6 +1,6 @@
 import express from 'express'
 import bodyParser from 'body-parser'
-import cors from 'cors'
+import cors, { type CorsOptions } from 'cors'
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process'
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js'
@@ -8,6 +8,7 @@ import { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js'
 import { Logger } from '../types.js'
 import { getVersion } from '../lib/getVersion.js'
 import { onSignals } from '../lib/onSignals.js'
+import { serializeCorsOrigin } from '../lib/serializeCorsOrigin.js'
 
 export interface StdioToSseArgs {
   stdioCmd: string
@@ -16,7 +17,7 @@ export interface StdioToSseArgs {
   ssePath: string
   messagePath: string
   logger: Logger
-  enableCors: boolean
+  corsOrigin: CorsOptions['origin']
   healthEndpoints: string[]
   headers: Record<string, string>
 }
@@ -40,7 +41,7 @@ export async function stdioToSse(args: StdioToSseArgs) {
     ssePath,
     messagePath,
     logger,
-    enableCors,
+    corsOrigin,
     healthEndpoints,
     headers,
   } = args
@@ -56,7 +57,9 @@ export async function stdioToSse(args: StdioToSseArgs) {
   logger.info(`  - ssePath: ${ssePath}`)
   logger.info(`  - messagePath: ${messagePath}`)
 
-  logger.info(`  - CORS enabled: ${enableCors}`)
+  logger.info(
+    `  - CORS: ${corsOrigin ? `enabled (${serializeCorsOrigin({ corsOrigin })})` : 'disabled'}`,
+  )
   logger.info(
     `  - Health endpoints: ${healthEndpoints.length ? healthEndpoints.join(', ') : '(none)'}`,
   )
@@ -81,8 +84,8 @@ export async function stdioToSse(args: StdioToSseArgs) {
 
   const app = express()
 
-  if (enableCors) {
-    app.use(cors())
+  if (corsOrigin) {
+    app.use(cors({ origin: corsOrigin }))
   }
 
   app.use((req, res, next) => {
