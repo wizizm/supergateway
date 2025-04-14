@@ -19,9 +19,10 @@ npx -y supergateway --stdio "uvx mcp-server-git"
 - **`--baseUrl "http://localhost:8000"`**: Base URL for SSE or WS clients (stdio→SSE mode; optional)
 - **`--ssePath "/sse"`**: Path for SSE subscriptions (stdio→SSE mode, default: `/sse`)
 - **`--messagePath "/message"`**: Path for messages (stdio→SSE or stdio→WS mode, default: `/message`)
-- **`--header "Authorization: Bearer 123"`**: Add one or more headers (stdio→SSE or SSE→stdio mode; can be used multiple times)
+- **`--header "x-user-id: 123"`**: Add one or more headers (stdio→SSE or SSE→stdio mode; can be used multiple times)
+- **`--oauth2Bearer "some-access-token"`**: Adds an `Authorization` header with the provided Bearer token
 - **`--logLevel info | none`**: Controls logging level (default: `info`). Use `none` to suppress all logs.
-- **`--cors`**: Enable CORS (stdio→SSE or stdio→WS mode)
+- **`--cors`**: Enable CORS (stdio→SSE or stdio→WS mode). Use `--cors` with no values to allow all origins, or supply one or more allowed origins (e.g. `--cors "http://example.com"` or `--cors "/example\\.com$/"` for regex matching).
 - **`--healthEndpoint /healthz`**: Register one or more endpoints (stdio→SSE or stdio→WS mode; can be used multiple times) that respond with `"ok"`
 
 ## stdio → SSE
@@ -53,8 +54,8 @@ You can also pass headers when sending requests. This is useful for authenticati
 ```bash
 npx -y supergateway \
     --sse "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app" \
-    --header "Authorization: Bearer some-token" \
-    --header "X-My-Header: another-value"
+    --oauth2Bearer "some-access-token" \
+    --header "X-My-Header: another-header-value"
 ```
 
 ## stdio → WS
@@ -168,6 +169,50 @@ Claude Desktop can use Supergateway’s SSE→stdio mode.
   }
 }
 ```
+
+## Using with Cursor (SSE → stdio mode)
+
+Cursor can also integrate with Supergateway in SSE→stdio mode. The configuration is similar to Claude Desktop.
+
+### NPX-based MCP Server Example for Cursor
+
+```json
+{
+  "mcpServers": {
+    "cursorExampleNpx": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "supergateway",
+        "--sse",
+        "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"
+      ]
+    }
+  }
+}
+```
+
+### Docker-based MCP Server Example for Cursor
+
+```json
+{
+  "mcpServers": {
+    "cursorExampleDocker": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "supercorp/supergateway",
+        "--sse",
+        "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"
+      ]
+    }
+  }
+}
+```
+
+**Note:** Although the setup supports sending headers via the `--header` flag, if you need to pass an Authorization header (which typically includes a space, e.g. `"Bearer 123"`), you must use the `--oauth2Bearer` flag due to a known Cursor bug with spaces in command-line arguments.
 
 ## Why MCP?
 
