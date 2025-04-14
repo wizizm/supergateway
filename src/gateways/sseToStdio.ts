@@ -135,6 +135,8 @@ export async function sseToStdio(args: SseToStdioArgs) {
             logger.info('SSE client not initialized, creating fallback client')
             sseClient = await newFallbackSseClient({ sseTransport })
           }
+
+          logger.info('SSE connected')
         } else {
           result = await sseClient.request(req, z.any())
         }
