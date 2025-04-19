@@ -92,14 +92,15 @@ You can now list tools, resources, or perform MCP actions via Supergateway.
 Use [ngrok](https://ngrok.com/) to share your local MCP server publicly:
 
 ```bash
-npx -y supergateway --port 8000 \
-    --stdio "npx -y @modelcontextprotocol/server-filesystem ."
+npx -y supergateway --port 8000 --stdio "npx -y @modelcontextprotocol/server-filesystem ."
 
 # In another terminal:
 ngrok http 8000
 ```
 
-ngrok provides a public URL for remote access.
+ngrok provides a public URL for remote access. 
+
+MCP server will be available at URL similar to: https://1234-567-890-12-456.ngrok-free.app/sse
 
 ## Running with Docker
 
