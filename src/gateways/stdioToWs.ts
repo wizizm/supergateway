@@ -1,12 +1,12 @@
-import express from 'express'
-import cors, { type CorsOptions } from 'cors'
-import { createServer } from 'http'
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process'
+import express from 'express'
+import cors from 'cors'
+import { createServer } from 'http'
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
-import { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js'
-import { Logger } from '../types.js'
-import { getVersion } from '../lib/getVersion.js'
 import { WebSocketServerTransport } from '../server/websocket.js'
+import { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js'
+import { getVersion } from '../lib/getVersion.js'
+import { Logger, CorsOptions } from '../types.js'
 import { onSignals } from '../lib/onSignals.js'
 import { serializeCorsOrigin } from '../lib/serializeCorsOrigin.js'
 
@@ -22,6 +22,7 @@ export interface StdioToWsArgs {
 export async function stdioToWs(args: StdioToWsArgs) {
   const { stdioCmd, port, messagePath, logger, healthEndpoints, corsOrigin } =
     args
+
   logger.info(`  - port: ${port}`)
   logger.info(`  - stdio: ${stdioCmd}`)
   logger.info(`  - messagePath: ${messagePath}`)
@@ -53,7 +54,19 @@ export async function stdioToWs(args: StdioToWsArgs) {
   })
 
   try {
-    child = spawn(stdioCmd, { shell: true })
+    // 解析命令和参数
+    const cmdParts = stdioCmd.split(/\s+/).filter((part) => part.length > 0)
+    const command = cmdParts[0]
+    const cmdArgs = cmdParts.slice(1)
+
+    logger.info(`启动子进程: ${command} ${cmdArgs.join(' ')}`)
+
+    // 以非shell模式启动子进程
+    child = spawn(command, cmdArgs, {
+      env: process.env,
+      shell: false, // 明确设置为false，避免shell解析问题
+    })
+
     child.on('exit', (code, signal) => {
       logger.error(`Child exited: code=${code}, signal=${signal}`)
       cleanup()
@@ -117,25 +130,20 @@ export async function stdioToWs(args: StdioToWsArgs) {
       server: httpServer,
     })
 
-    await server.connect(wsTransport)
-
     wsTransport.onmessage = (msg: JSONRPCMessage) => {
-      const line = JSON.stringify(msg)
-      logger.info(`WebSocket → Child: ${line}`)
-      child!.stdin.write(line + '\n')
+      logger.info(`WebSocket → Child: ${JSON.stringify(msg)}`)
+      child?.stdin.write(JSON.stringify(msg) + '\n')
     }
 
-    wsTransport.onconnection = (clientId: string) => {
-      logger.info(`New WebSocket connection: ${clientId}`)
+    wsTransport.onclose = () => {
+      logger.info('WebSocket connection closed')
     }
 
-    wsTransport.ondisconnection = (clientId: string) => {
-      logger.info(`WebSocket connection closed: ${clientId}`)
-    }
-
-    wsTransport.onerror = (err: Error) => {
+    wsTransport.onerror = (err) => {
       logger.error(`WebSocket error: ${err.message}`)
     }
+
+    await server.connect(wsTransport)
 
     isReady = true
 

@@ -14,6 +14,12 @@
  *
  *   # stdio→WS
  *   npx -y supergateway --stdio "npx -y @modelcontextprotocol/server-filesystem /" --outputTransport ws
+ *
+ *   # stdio→Streamable HTTP
+ *   npx -y supergateway --stdio "npx -y @modelcontextprotocol/server-filesystem /" --outputTransport streamable-http --httpPath /mcp
+ *
+ *   # SSE→Streamable HTTP
+ *   npx -y supergateway --sse "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app" --outputTransport streamable-http --httpPath /mcp
  */
 
 import yargs from 'yargs'
@@ -22,6 +28,8 @@ import { Logger } from './types.js'
 import { stdioToSse } from './gateways/stdioToSse.js'
 import { sseToStdio } from './gateways/sseToStdio.js'
 import { stdioToWs } from './gateways/stdioToWs.js'
+import { stdioToStreamableHttp } from './gateways/stdioToStreamableHttp.js'
+import { sseToStreamableHttp } from './gateways/sseToStreamableHttp.js'
 import { headers } from './lib/headers.js'
 import { corsOrigin } from './lib/corsOrigin.js'
 
@@ -51,6 +59,17 @@ const getLogger = ({
   return { info: log, error: logStderr }
 }
 
+/**
+ * 处理命令拆分，确保正确启动子进程
+ */
+function parseCommand(cmdString: string): { command: string; args: string[] } {
+  const parts = cmdString.split(/\s+/).filter((part) => part.length > 0)
+  return {
+    command: parts[0],
+    args: parts.slice(1),
+  }
+}
+
 async function main() {
   const argv = yargs(hideBin(process.argv))
     .option('stdio', {
@@ -63,7 +82,7 @@ async function main() {
     })
     .option('outputTransport', {
       type: 'string',
-      choices: ['stdio', 'sse', 'ws'],
+      choices: ['stdio', 'sse', 'ws', 'streamable-http'],
       default: () => {
         const args = hideBin(process.argv)
 
@@ -78,12 +97,13 @@ async function main() {
     .option('port', {
       type: 'number',
       default: 8000,
-      description: '(stdio→SSE, stdio→WS) Port for output MCP server',
+      description:
+        '(stdio→SSE/WS/Streamable-HTTP, SSE→Streamable-HTTP) Port for output MCP server',
     })
     .option('baseUrl', {
       type: 'string',
       default: '',
-      description: '(stdio→SSE) Base URL for output MCP server',
+      description: '(stdio→SSE/Streamable-HTTP) Base URL for output MCP server',
     })
     .option('ssePath', {
       type: 'string',
@@ -93,7 +113,13 @@ async function main() {
     .option('messagePath', {
       type: 'string',
       default: '/message',
-      description: '(stdio→SSE, stdio→WS) Path for messages',
+      description: '(stdio→SSE/WS) Path for messages',
+    })
+    .option('httpPath', {
+      type: 'string',
+      default: '/mcp',
+      description:
+        '(stdio→Streamable-HTTP, SSE→Streamable-HTTP) Path for Streamable HTTP',
     })
     .option('logLevel', {
       choices: ['info', 'none'] as const,
@@ -173,6 +199,20 @@ async function main() {
           corsOrigin: corsOrigin({ argv }),
           healthEndpoints: argv.healthEndpoint as string[],
         })
+      } else if (argv.outputTransport === 'streamable-http') {
+        await stdioToStreamableHttp({
+          stdioCmd: argv.stdio!,
+          port: argv.port,
+          baseUrl: argv.baseUrl,
+          httpPath: argv.httpPath,
+          logger,
+          corsOrigin: corsOrigin({ argv }),
+          healthEndpoints: argv.healthEndpoint as string[],
+          headers: headers({
+            argv,
+            logger,
+          }),
+        })
       } else {
         logStderr(`Error: stdio→${argv.outputTransport} not supported`)
         process.exit(1)
@@ -182,6 +222,19 @@ async function main() {
         await sseToStdio({
           sseUrl: argv.sse!,
           logger,
+          headers: headers({
+            argv,
+            logger,
+          }),
+        })
+      } else if (argv.outputTransport === 'streamable-http') {
+        await sseToStreamableHttp({
+          sseUrl: argv.sse!,
+          port: argv.port,
+          httpPath: argv.httpPath,
+          logger,
+          corsOrigin: corsOrigin({ argv }),
+          healthEndpoints: argv.healthEndpoint as string[],
           headers: headers({
             argv,
             logger,

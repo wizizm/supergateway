@@ -1,6 +1,8 @@
 ![Supergateway: Run stdio MCP servers over SSE and WS](https://raw.githubusercontent.com/supercorp-ai/supergateway/main/supergateway.png)
 
-**Supergateway** runs **MCP stdio-based servers** over **SSE (Server-Sent Events)** or **WebSockets (WS)** with one command. This is useful for remote access, debugging, or connecting to clients when your MCP server only supports stdio.
+**Supergateway** runs **MCP stdio-based servers** over **SSE (Server-Sent Events)**, **WebSockets (WS)**, or **Streamable HTTP** with one command. This is useful for remote access, debugging, or connecting to clients when your MCP server only supports stdio.
+
+Supergateway provides complete interoperability between different MCP transport protocols, allowing seamless conversion between stdio, SSE, WS, and Streamable HTTP (the latest MCP standard).
 
 Supported by [Supermachine](https://supermachine.ai) (hosted MCPs), [Superinterface](https://superinterface.ai), and [Supercorp](https://supercorp.ai).
 
@@ -14,16 +16,17 @@ npx -y supergateway --stdio "uvx mcp-server-git"
 
 - **`--stdio "command"`**: Command that runs an MCP server over stdio
 - **`--sse "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"`**: SSE URL to connect to (SSE→stdio mode)
-- **`--outputTransport stdio | sse | ws`**: Output MCP transport (default: `sse` with `--stdio`, `stdio` with `--sse`)
-- **`--port 8000`**: Port to listen on (stdio→SSE or stdio→WS mode, default: `8000`)
-- **`--baseUrl "http://localhost:8000"`**: Base URL for SSE or WS clients (stdio→SSE mode; optional)
+- **`--outputTransport stdio | sse | ws | streamable-http`**: Output MCP transport (default: `sse` with `--stdio`, `stdio` with `--sse`)
+- **`--port 8000`**: Port to listen on (stdio→SSE/WS/Streamable-HTTP mode, default: `8000`)
+- **`--baseUrl "http://localhost:8000"`**: Base URL for SSE, WS, or Streamable HTTP clients (optional)
 - **`--ssePath "/sse"`**: Path for SSE subscriptions (stdio→SSE mode, default: `/sse`)
-- **`--messagePath "/message"`**: Path for messages (stdio→SSE or stdio→WS mode, default: `/message`)
-- **`--header "x-user-id: 123"`**: Add one or more headers (stdio→SSE or SSE→stdio mode; can be used multiple times)
+- **`--messagePath "/message"`**: Path for messages (stdio→SSE/WS mode, default: `/message`)
+- **`--httpPath "/mcp"`**: Path for Streamable HTTP (stdio→Streamable-HTTP mode, default: `/mcp`)
+- **`--header "x-user-id: 123"`**: Add one or more headers (can be used multiple times)
 - **`--oauth2Bearer "some-access-token"`**: Adds an `Authorization` header with the provided Bearer token
 - **`--logLevel info | none`**: Controls logging level (default: `info`). Use `none` to suppress all logs.
-- **`--cors`**: Enable CORS (stdio→SSE or stdio→WS mode). Use `--cors` with no values to allow all origins, or supply one or more allowed origins (e.g. `--cors "http://example.com"` or `--cors "/example\\.com$/"` for regex matching).
-- **`--healthEndpoint /healthz`**: Register one or more endpoints (stdio→SSE or stdio→WS mode; can be used multiple times) that respond with `"ok"`
+- **`--cors`**: Enable CORS. Use `--cors` with no values to allow all origins, or supply one or more allowed origins (e.g. `--cors "http://example.com"` or `--cors "/example\\.com$/"` for regex matching).
+- **`--healthEndpoint /healthz`**: Register one or more endpoints that respond with `"ok"`
 
 ## stdio → SSE
 
@@ -38,6 +41,19 @@ npx -y supergateway \
 
 - **Subscribe to events**: `GET http://localhost:8000/sse`
 - **Send messages**: `POST http://localhost:8000/message`
+
+## stdio → Streamable HTTP
+
+Expose an MCP stdio server as a Streamable HTTP server (the new MCP protocol standard):
+
+```bash
+npx -y supergateway \
+    --stdio "npx -y @modelcontextprotocol/server-filesystem ./my-folder" \
+    --port 8000 --baseUrl http://localhost:8000 \
+    --outputTransport streamable-http --httpPath /mcp
+```
+
+- **Streamable HTTP endpoint**: `http://localhost:8000/mcp`
 
 ## SSE → stdio
 
@@ -57,6 +73,18 @@ npx -y supergateway \
     --oauth2Bearer "some-access-token" \
     --header "X-My-Header: another-header-value"
 ```
+
+## SSE → Streamable HTTP
+
+Convert a remote SSE MCP server to Streamable HTTP:
+
+```bash
+npx -y supergateway \
+    --sse "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app" \
+    --outputTransport streamable-http --port 8000 --httpPath /mcp
+```
+
+- **Streamable HTTP endpoint**: `http://localhost:8000/mcp`
 
 ## stdio → WS
 
@@ -98,7 +126,7 @@ npx -y supergateway --port 8000 --stdio "npx -y @modelcontextprotocol/server-fil
 ngrok http 8000
 ```
 
-ngrok provides a public URL for remote access. 
+ngrok provides a public URL for remote access.
 
 MCP server will be available at URL similar to: https://1234-567-890-12-456.ngrok-free.app/sse
 
@@ -115,7 +143,17 @@ docker run -it --rm -p 8000:8000 supercorp/supergateway \
     --port 8000
 ```
 
-Docker pulls the image automatically. The MCP server runs in the container’s root directory (`/`). You can mount host directories if needed.
+Docker pulls the image automatically. The MCP server runs in the container's root directory (`/`). You can mount host directories if needed.
+
+### Using Streamable HTTP with Docker
+
+```bash
+docker run -it --rm -p 8000:8000 supercorp/supergateway \
+    --stdio "npx -y @modelcontextprotocol/server-filesystem /" \
+    --outputTransport streamable-http --port 8000 --httpPath /mcp
+```
+
+This exposes the MCP server as a Streamable HTTP server on `http://localhost:8000/mcp`.
 
 ### Building the Image Yourself
 
@@ -131,7 +169,7 @@ docker run -it --rm -p 8000:8000 supergateway \
 
 ## Using with Claude Desktop (SSE → stdio mode)
 
-Claude Desktop can use Supergateway’s SSE→stdio mode.
+Claude Desktop can use Supergateway's SSE→stdio mode.
 
 ### NPX-based MCP Server Example
 
@@ -215,9 +253,49 @@ Cursor can also integrate with Supergateway in SSE→stdio mode. The configurati
 
 **Note:** Although the setup supports sending headers via the `--header` flag, if you need to pass an Authorization header (which typically includes a space, e.g. `"Bearer 123"`), you must use the `--oauth2Bearer` flag due to a known Cursor bug with spaces in command-line arguments.
 
+## Using with Modern MCP Clients (Streamable HTTP)
+
+Newer MCP clients support the Streamable HTTP transport, which is recommended for all new integrations. Supergateway makes it easy to connect these clients to any MCP server, regardless of the transport it uses.
+
+### Using with Modern Cursor (Streamable HTTP mode)
+
+Cursor can use Supergateway's stdio→Streamable HTTP mode for more efficient communication:
+
+```json
+{
+  "mcpServers": {
+    "modernCursorExample": {
+      "type": "streamableHttp",
+      "url": "http://localhost:8000/mcp"
+    }
+  }
+}
+```
+
+Run Supergateway on your local machine:
+
+```bash
+npx -y supergateway \
+    --stdio "npx -y @modelcontextprotocol/server-filesystem ./my-folder" \
+    --outputTransport streamable-http --port 8000 --httpPath /mcp
+```
+
+### Backwards Compatibility
+
+Supergateway automatically manages compatibility between different MCP transport mechanisms, allowing you to:
+
+- Connect legacy SSE clients to stdio servers
+- Connect modern Streamable HTTP clients to stdio servers
+- Connect stdio clients to SSE servers
+- Convert SSE servers to Streamable HTTP servers
+
+This ensures smooth transitions as the MCP ecosystem evolves.
+
 ## Why MCP?
 
-[Model Context Protocol](https://spec.modelcontextprotocol.io/) standardizes AI tool interactions. Supergateway converts MCP stdio servers into SSE or WS services, simplifying integration and debugging with web-based or remote clients.
+[Model Context Protocol](https://spec.modelcontextprotocol.io/) standardizes AI tool interactions. Supergateway converts between different MCP transport types (stdio, SSE, WS, and Streamable HTTP), simplifying integration and debugging with various clients.
+
+The Streamable HTTP transport is the latest MCP standard, offering improved performance and better compatibility with modern web infrastructure. Supergateway makes it easy to use this transport with any MCP server, regardless of the transport it natively supports.
 
 ## Advanced Configuration
 
