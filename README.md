@@ -157,15 +157,20 @@ This exposes the MCP server as a Streamable HTTP server on `http://localhost:800
 
 ### Building the Image Yourself
 
-Use provided Dockerfile:
-
 ```bash
+# 1. Compile TypeScript
+npm run build
+
+# 2. Build Docker image
 docker build -t supergateway .
 
+# 3. Run the container
 docker run -it --rm -p 8000:8000 supergateway \
     --stdio "npx -y @modelcontextprotocol/server-filesystem /" \
     --port 8000
 ```
+
+The Docker image includes all necessary dependencies and runs Supergateway directly from the container without requiring installation from npm.
 
 ## Using with Claude Desktop (SSE → stdio mode)
 
