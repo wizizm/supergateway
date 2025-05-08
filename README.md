@@ -1,10 +1,28 @@
 ![Supergateway: Run stdio MCP servers over SSE and WS](https://raw.githubusercontent.com/supercorp-ai/supergateway/main/supergateway.png)
 
-**Supergateway** runs **MCP stdio-based servers** over **SSE (Server-Sent Events)**, **WebSockets (WS)**, or **Streamable HTTP** with one command. This is useful for remote access, debugging, or connecting to clients when your MCP server only supports stdio.
+**Supergateway** 不仅可以运行 **MCP stdio-based servers** 通过 **SSE (Server-Sent Events)**、**WebSockets (WS)** 或 **Streamable HTTP**，还支持将 OpenAPI 3.0.1 格式的 API 接口定义转换为 MCP 工具。
 
 Supergateway provides complete interoperability between different MCP transport protocols, allowing seamless conversion between stdio, SSE, WS, and Streamable HTTP (the latest MCP standard).
 
 Supported by [Supermachine](https://supermachine.ai) (hosted MCPs), [Superinterface](https://superinterface.ai), and [Supercorp](https://supercorp.ai).
+
+## 功能特点
+
+1. 协议转换
+
+   - 支持 stdio、SSE、WS 和 Streamable HTTP 之间的相互转换
+   - 提供完整的 MCP 协议兼容性
+
+2. API 转换
+
+   - 支持将 OpenAPI 3 格式的接口定义转换为 MCP 工具
+   - 自动生成工具名称、描述和参数定义
+   - 支持复杂的参数类型和验证规则
+
+3. 会话管理
+   - 支持多会话并发
+   - 自动会话超时清理
+   - 详细的会话状态日志
 
 ## Installation & Usage
 
@@ -330,3 +348,80 @@ Issues and PRs welcome. Please open one if you encounter problems or have featur
 ## License
 
 [MIT License](./LICENSE)
+
+## Open 转 MCP 服务功能
+
+SuperGateway 现在支持将 OpenAPI 3.1 接口定义转换为 MCP 工具。这使得您可以轻松地将现有的 REST API 集成到 MCP 服务中。
+
+### 使用方法
+
+1. 准备 OpenAPI 3.1 格式的接口定义文件（例如：openapi.json）
+
+2. 使用以下命令启动服务：
+
+```bash
+node dist/index.js --api ./openapi.json --apiHost https://your-api-host.com \
+    --outputTransport streamable-http --port 8000 --httpPath /mcp --logLevel info
+```
+
+### 参数说明
+
+- `--api`: OpenAPI 3.1 接口定义文件的路径
+- `--apiHost`: API 服务的基础 URL
+- `--outputTransport`: 输出传输方式，使用 streamable-http
+- `--port`: 服务监听端口
+- `--httpPath`: HTTP 路径前缀
+- `--logLevel`: 日志级别
+
+### 功能特点
+
+- 自动将 OpenAPI 接口转换为 MCP 工具
+- 支持路径参数、查询参数和请求体
+- 自动处理参数验证
+- 错误处理和日志记录
+- 支持所有标准 HTTP 方法
+
+### 示例
+
+假设您有以下 OpenAPI 定义：
+
+```json
+{
+  "openapi": "3.1.0",
+  "paths": {
+    "/users/{id}": {
+      "get": {
+        "operationId": "getUserById",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+这将被转换为名为 `getUserById` 的 MCP 工具，可以通过以下方式调用：
+
+```json
+{
+  "name": "getUserById",
+  "parameters": {
+    "id": "123"
+  }
+}
+```
+
+### 注意事项
+
+- 确保 OpenAPI 定义文件格式正确
+- API Host URL 必须是有效的 HTTPS/HTTP URL
+- 所有必需参数都必须提供
+- 请求和响应的 Content-Type 默认为 application/json

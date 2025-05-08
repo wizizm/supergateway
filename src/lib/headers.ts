@@ -1,54 +1,29 @@
 import { Logger } from '../types.js'
 
-const parseHeaders = ({
-  argvHeader,
-  logger,
-}: {
-  argvHeader: (string | number)[]
-  logger: Logger
-}): Record<string, string> => {
-  return argvHeader.reduce<Record<string, string>>((acc, rawHeader) => {
-    const header = `${rawHeader}`
-
-    const colonIndex = header.indexOf(':')
-    if (colonIndex === -1) {
-      logger.error(`Invalid header format: ${header}, ignoring`)
-      return acc
-    }
-
-    const key = header.slice(0, colonIndex).trim()
-    const value = header.slice(colonIndex + 1).trim()
-
-    if (!key || !value) {
-      logger.error(`Invalid header format: ${header}, ignoring`)
-      return acc
-    }
-
-    acc[key] = value
-    return acc
-  }, {})
-}
-
-export const headers = ({
-  argv,
-  logger,
-}: {
+interface HeadersArgs {
   argv: {
-    header: (string | number)[]
-    oauth2Bearer: string | undefined
+    header?: string[]
+    oauth2Bearer?: string
   }
   logger: Logger
-}): Record<string, string> => {
-  const headers = parseHeaders({
-    argvHeader: argv.header,
-    logger,
-  })
+}
 
-  if ('oauth2Bearer' in argv) {
-    return {
-      ...headers,
-      Authorization: `Bearer ${argv.oauth2Bearer}`,
+export function headers({ argv, logger }: HeadersArgs): Record<string, string> {
+  const headers: Record<string, string> = {}
+
+  // 处理自定义头部
+  if (argv.header) {
+    for (const header of argv.header) {
+      const [key, value] = header.split(':').map((s) => s.trim())
+      if (key && value) {
+        headers[key] = value
+      }
     }
+  }
+
+  // 处理 OAuth2 Bearer 令牌
+  if (argv.oauth2Bearer) {
+    headers['Authorization'] = `Bearer ${argv.oauth2Bearer}`
   }
 
   return headers
