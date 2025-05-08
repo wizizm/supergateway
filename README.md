@@ -349,24 +349,24 @@ Issues and PRs welcome. Please open one if you encounter problems or have featur
 
 [MIT License](./LICENSE)
 
-## Open 转 MCP 服务功能
+## OpenAPI 转 MCP 服务功能
 
-SuperGateway 现在支持将 OpenAPI 3.1 接口定义转换为 MCP 工具。这使得您可以轻松地将现有的 REST API 集成到 MCP 服务中。
+SuperGateway 现在支持将 OpenAPI 3.0/3.1 接口定义转换为 MCP 工具。这使得您可以轻松地将现有的 REST API 集成到 MCP 服务中，转换基于 Higress 的 OpenAPI-to-MCPServer 实现规范。
 
 ### 使用方法
 
-1. 准备 OpenAPI 3.1 格式的接口定义文件（例如：openapi.json）
+1. 准备 OpenAPI 3.0/3.1 格式的接口定义文件（例如：openapi.json）
 
 2. 使用以下命令启动服务：
 
 ```bash
-node dist/index.js --api ./openapi.json --apiHost https://your-api-host.com \
+npx -y supergateway --api ./openapi.json --apiHost https://your-api-host.com \
     --outputTransport streamable-http --port 8000 --httpPath /mcp --logLevel info
 ```
 
 ### 参数说明
 
-- `--api`: OpenAPI 3.1 接口定义文件的路径
+- `--api`: OpenAPI 3.0/3.1 接口定义文件的路径
 - `--apiHost`: API 服务的基础 URL
 - `--outputTransport`: 输出传输方式，使用 streamable-http
 - `--port`: 服务监听端口
@@ -375,11 +375,13 @@ node dist/index.js --api ./openapi.json --apiHost https://your-api-host.com \
 
 ### 功能特点
 
-- 自动将 OpenAPI 接口转换为 MCP 工具
-- 支持路径参数、查询参数和请求体
-- 自动处理参数验证
-- 错误处理和日志记录
-- 支持所有标准 HTTP 方法
+- 自动将 OpenAPI 接口转换为标准 MCP 工具
+- 支持路径参数、查询参数、请求体参数和头参数
+- 自动处理参数验证和转换
+- 提供详细的响应模板，包含字段描述信息
+- 支持所有标准 HTTP 方法（GET, POST, PUT, DELETE, PATCH）
+- 提供 `/mcp-config` 调试端点查看生成的 MCP 配置
+- 优化的 URL 路径参数处理，支持正确的 URL 编码
 
 ### 示例
 
@@ -387,7 +389,7 @@ node dist/index.js --api ./openapi.json --apiHost https://your-api-host.com \
 
 ```json
 {
-  "openapi": "3.1.0",
+  "openapi": "3.0.0",
   "paths": {
     "/users/{id}": {
       "get": {
@@ -399,9 +401,36 @@ node dist/index.js --api ./openapi.json --apiHost https://your-api-host.com \
             "required": true,
             "schema": {
               "type": "string"
+            },
+            "description": "用户ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功获取用户信息",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "用户ID"
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "用户名称"
+                    },
+                    "email": {
+                      "type": "string",
+                      "description": "用户邮箱"
+                    }
+                  }
+                }
+              }
             }
           }
-        ]
+        }
       }
     }
   }
@@ -419,9 +448,37 @@ node dist/index.js --api ./openapi.json --apiHost https://your-api-host.com \
 }
 ```
 
+响应将包含丰富的数据结构描述信息，帮助 LLM 更好地理解 API 响应：
+
+```
+# API Response Information
+
+Below is the response from an API call. To help you understand the data, I've provided:
+
+1. A detailed description of all fields in the response structure
+2. The complete API response
+
+## Response Structure
+
+> Content-Type: application/json
+
+- **id**: 用户ID (Type: string)
+- **name**: 用户名称 (Type: string)
+- **email**: 用户邮箱 (Type: string)
+
+## Original Response
+
+{
+  "id": "123",
+  "name": "张三",
+  "email": "zhangsan@example.com"
+}
+```
+
 ### 注意事项
 
 - 确保 OpenAPI 定义文件格式正确
 - API Host URL 必须是有效的 HTTPS/HTTP URL
 - 所有必需参数都必须提供
 - 请求和响应的 Content-Type 默认为 application/json
+- 可以通过访问 `/mcp-config` 端点查看生成的 MCP 工具配置
