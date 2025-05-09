@@ -37,6 +37,7 @@
     "axios": "^1.9.0",
     "body-parser": "^1.20.3",
     "cors": "^2.8.5",
+    "eventsource": "^3.0.6",
     "express": "^4.21.2",
     "js-yaml": "^4.1.0",
     "node-fetch": "^3.3.2",

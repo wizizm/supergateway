@@ -360,8 +360,13 @@ SuperGateway 现在支持将 OpenAPI 文档转换为 MCP 服务，并提供自�
 2. 使用以下命令启动服务：
 
 ```bash
+# 使用 Streamable HTTP 传输
 npx -y supergateway --api ./openapi.json --apiHost https://your-api-host.com \
     --outputTransport streamable-http --port 8000 --httpPath /mcp --logLevel info
+
+# 使用 SSE 传输
+npx -y supergateway --api ./openapi.json --apiHost https://your-api-host.com \
+    --outputTransport sse --port 8000 --ssePath /sse --messagePath /message --logLevel info
 ```
 
 SuperGateway 将自动检测文件类型：
@@ -373,14 +378,17 @@ SuperGateway 将自动检测文件类型：
 
 - `--api`: OpenAPI 文档或 MCP 模板文件路径（JSON 或 YAML 格式）
 - `--apiHost`: API 服务的基础 URL
-- `--outputTransport`: 输出传输方式，使用 streamable-http
+- `--outputTransport`: 输出传输方式，支持 `streamable-http` 和 `sse`
 - `--port`: 服务监听端口
-- `--httpPath`: HTTP 路径前缀
+- `--httpPath`: HTTP 路径前缀（当 outputTransport 为 streamable-http 时使用）
+- `--ssePath`: SSE 订阅路径（当 outputTransport 为 sse 时使用）
+- `--messagePath`: SSE 消息路径（当 outputTransport 为 sse 时使用）
 - `--logLevel`: 日志级别
 
 ### 功能特点
 
 - **自动检测文件类型**：智能识别输入是 OpenAPI 规范还是 MCP 模板
+- **多种传输协议**：支持 Streamable HTTP 和 SSE 两种传输方式
 - 支持直接从 OpenAPI 文档生成 MCP 工具定义
 - 支持预生成的 MCP 模板文件（JSON 或 YAML 格式）
 - 自动处理路径参数、查询参数、请求体参数和头参数

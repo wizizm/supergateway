@@ -1,0 +1,28 @@
+{
+  "server": {
+    "name": "test-sse-server",
+    "version": "1.0.0"
+  },
+  "tools": [
+    {
+      "name": "testTool",
+      "description": "A test tool for SSE",
+      "args": [
+        {
+          "name": "param",
+          "description": "A test parameter",
+          "type": "string",
+          "required": false,
+          "position": "query"
+        }
+      ],
+      "requestTemplate": {
+        "url": "/api/test",
+        "method": "GET"
+      },
+      "responseTemplate": {
+        "prependBody": "# Test SSE response\n\n"
+      }
+    }
+  ]
+}

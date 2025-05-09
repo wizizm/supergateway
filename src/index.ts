@@ -33,6 +33,7 @@ import { sseToStreamableHttp } from './gateways/sseToStreamableHttp.js'
 import { headers } from './lib/headers.js'
 import { corsOrigin } from './lib/corsOrigin.js'
 import { apiToStreamableHttp } from './gateways/apiToStreamableHttp.js'
+import { apiToSse } from './gateways/apiToSse.js'
 import { parseArgs } from './lib/parseArgs.js'
 
 const log = (...args: any[]) => console.log('[supergateway]', ...args)
@@ -124,7 +125,7 @@ async function main() {
         return undefined
       },
       description:
-        'Transport for output. Default is "sse" when using --stdio and "stdio" when using --sse.',
+        'Transport for output. Default is "sse" when using --stdio and "stdio" when using --sse. API supports "streamable-http" and "sse".',
     },
     port: {
       type: Number,
@@ -140,12 +141,12 @@ async function main() {
     ssePath: {
       type: String,
       default: '/sse',
-      description: '(stdio→SSE) Path for SSE subscriptions',
+      description: '(stdio→SSE, api→SSE) Path for SSE subscriptions',
     },
     messagePath: {
       type: String,
       default: '/message',
-      description: '(stdio→SSE/WS) Path for messages',
+      description: '(stdio→SSE/WS, api→SSE) Path for messages',
     },
     httpPath: {
       type: String,
@@ -301,23 +302,38 @@ async function main() {
         process.exit(1)
       }
     } else if (args.api) {
-      if (args.outputTransport !== 'streamable-http') {
-        throw new Error('API 模式只支持 streamable-http 输出传输方式')
-      }
-
-      await apiToStreamableHttp({
-        mcpTemplateFile: args.api,
-        apiHost: args.apiHost!,
-        port: args.port || 8000,
-        httpPath: args.httpPath || '/mcp',
-        logger,
-        corsOrigin: corsOrigin({ argv: argsWithDefaults }),
-        healthEndpoints: argsWithDefaults.healthEndpoint,
-        headers: headers({
-          argv: argsWithDefaults,
+      if (args.outputTransport === 'streamable-http') {
+        await apiToStreamableHttp({
+          mcpTemplateFile: args.api,
+          apiHost: args.apiHost!,
+          port: args.port || 8000,
+          httpPath: args.httpPath || '/mcp',
           logger,
-        }),
-      })
+          corsOrigin: corsOrigin({ argv: argsWithDefaults }),
+          healthEndpoints: argsWithDefaults.healthEndpoint,
+          headers: headers({
+            argv: argsWithDefaults,
+            logger,
+          }),
+        })
+      } else if (args.outputTransport === 'sse') {
+        await apiToSse({
+          mcpTemplateFile: args.api,
+          apiHost: args.apiHost!,
+          port: args.port || 8000,
+          ssePath: args.ssePath || '/sse',
+          messagePath: args.messagePath || '/message',
+          logger,
+          corsOrigin: corsOrigin({ argv: argsWithDefaults }),
+          healthEndpoints: argsWithDefaults.healthEndpoint,
+          headers: headers({
+            argv: argsWithDefaults,
+            logger,
+          }),
+        })
+      } else {
+        throw new Error('API 模式只支持 streamable-http 和 sse 输出传输方式')
+      }
     } else {
       logStderr('Error: Invalid input transport')
       process.exit(1)
