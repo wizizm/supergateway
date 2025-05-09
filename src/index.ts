@@ -183,7 +183,7 @@ async function main() {
     },
     api: {
       type: String,
-      description: 'OpenAPI 3.1 接口定义文件的路径',
+      description: 'MCP模板文件路径（JSON或YAML格式）',
     },
     apiHost: {
       type: String,
@@ -306,7 +306,7 @@ async function main() {
       }
 
       await apiToStreamableHttp({
-        apiSpecPath: args.api,
+        mcpTemplateFile: args.api,
         apiHost: args.apiHost!,
         port: args.port || 8000,
         httpPath: args.httpPath || '/mcp',

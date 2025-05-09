@@ -351,11 +351,11 @@ Issues and PRs welcome. Please open one if you encounter problems or have featur
 
 ## OpenAPI 转 MCP 服务功能
 
-SuperGateway 现在支持将 OpenAPI 3.0/3.1 接口定义转换为 MCP 工具。这使得您可以轻松地将现有的 REST API 集成到 MCP 服务中，转换基于 Higress 的 OpenAPI-to-MCPServer 实现规范。
+SuperGateway 现在支持将 OpenAPI 文档转换为 MCP 服务，并提供自动检测文件类型的功能。无论输入是 OpenAPI 规范还是已有的 MCP 模板，系统都能正确识别并处理。
 
 ### 使用方法
 
-1. 准备 OpenAPI 3.0/3.1 格式的接口定义文件（例如：openapi.json）
+1. 准备 OpenAPI 文档（JSON 或 YAML 格式）或 MCP 模板文件
 
 2. 使用以下命令启动服务：
 
@@ -364,9 +364,14 @@ npx -y supergateway --api ./openapi.json --apiHost https://your-api-host.com \
     --outputTransport streamable-http --port 8000 --httpPath /mcp --logLevel info
 ```
 
+SuperGateway 将自动检测文件类型：
+
+- 如果是 OpenAPI 文档，会自动转换为 MCP 模板并提供服务
+- 如果是 MCP 模板文件，会直接使用该模板提供服务
+
 ### 参数说明
 
-- `--api`: OpenAPI 3.0/3.1 接口定义文件的路径
+- `--api`: OpenAPI 文档或 MCP 模板文件路径（JSON 或 YAML 格式）
 - `--apiHost`: API 服务的基础 URL
 - `--outputTransport`: 输出传输方式，使用 streamable-http
 - `--port`: 服务监听端口
@@ -375,110 +380,79 @@ npx -y supergateway --api ./openapi.json --apiHost https://your-api-host.com \
 
 ### 功能特点
 
-- 自动将 OpenAPI 接口转换为标准 MCP 工具
-- 支持路径参数、查询参数、请求体参数和头参数
-- 自动处理参数验证和转换
-- 提供详细的响应模板，包含字段描述信息
+- **自动检测文件类型**：智能识别输入是 OpenAPI 规范还是 MCP 模板
+- 支持直接从 OpenAPI 文档生成 MCP 工具定义
+- 支持预生成的 MCP 模板文件（JSON 或 YAML 格式）
+- 自动处理路径参数、查询参数、请求体参数和头参数
+- 提供详细的请求和响应模板
 - 支持所有标准 HTTP 方法（GET, POST, PUT, DELETE, PATCH）
-- 提供 `/mcp-config` 调试端点查看生成的 MCP 配置
+- 提供 `/mcp-config` 调试端点查看加载的 MCP 配置
 - 优化的 URL 路径参数处理，支持正确的 URL 编码
 
-### 示例
+### OpenAPI to MCP 转换工具
 
-假设您有以下 OpenAPI 定义：
+SuperGateway 还提供了独立的 `openapi-to-mcp` 命令行工具，用于将 OpenAPI 文档转换为 MCP 模板文件：
 
-```json
-{
-  "openapi": "3.0.0",
-  "paths": {
-    "/users/{id}": {
-      "get": {
-        "operationId": "getUserById",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "用户ID"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "成功获取用户信息",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string",
-                      "description": "用户ID"
-                    },
-                    "name": {
-                      "type": "string",
-                      "description": "用户名称"
-                    },
-                    "email": {
-                      "type": "string",
-                      "description": "用户邮箱"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-}
+```bash
+# 使用 npx 运行
+npx -y supergateway openapi-to-mcp --input openapi.json --output mcp-template.json
+
+# 或者直接使用二进制命令
+openapi-to-mcp --input openapi.json --output mcp-template.json
 ```
 
-这将被转换为名为 `getUserById` 的 MCP 工具，可以通过以下方式调用：
+#### 参数说明
 
-```json
-{
-  "name": "getUserById",
-  "parameters": {
-    "id": "123"
-  }
-}
+- `--input, -i`: OpenAPI 规范文件路径 (JSON 或 YAML)
+- `--output, -o`: 输出的 MCP 配置文件路径
+- `--server-name, -n`: MCP 服务器名称（默认: "openapi-server"）
+- `--tool-prefix, -p`: 工具名称前缀（默认: ""）
+- `--format, -f`: 输出格式 (yaml 或 json)（默认: "yaml"）
+- `--validate, -v`: 验证 OpenAPI 规范（默认: false）
+- `--template, -t`: 用于修补输出的模板文件路径（默认: ""）
+
+#### 模板格式
+
+模板文件可以用于自定义生成的 MCP 配置，例如添加通用的请求头或配置变量：
+
+```yaml
+server:
+  config:
+    apiKey: ''
+
+tools:
+  requestTemplate:
+    headers:
+      - key: Authorization
+        value: 'Bearer {{.config.apiKey}}'
+      - key: X-Ca-Nonce
+        value: '{{uuidv4}}'
 ```
 
-响应将包含丰富的数据结构描述信息，帮助 LLM 更好地理解 API 响应：
+### 使用指南
 
+#### 直接使用 OpenAPI 文档
+
+```bash
+npx -y supergateway --api ./openapi.json --apiHost https://api.example.com \
+    --outputTransport streamable-http --port 8000 --httpPath /mcp
 ```
-# API Response Information
 
-Below is the response from an API call. To help you understand the data, I've provided:
+#### 使用预生成的 MCP 模板
 
-1. A detailed description of all fields in the response structure
-2. The complete API response
+```bash
+# 首先生成 MCP 模板
+openapi-to-mcp --input openapi.json --output mcp-template.json
 
-## Response Structure
-
-> Content-Type: application/json
-
-- **id**: 用户ID (Type: string)
-- **name**: 用户名称 (Type: string)
-- **email**: 用户邮箱 (Type: string)
-
-## Original Response
-
-{
-  "id": "123",
-  "name": "张三",
-  "email": "zhangsan@example.com"
-}
+# 然后使用模板启动服务
+npx -y supergateway --api ./mcp-template.json --apiHost https://api.example.com \
+    --outputTransport streamable-http --port 8000 --httpPath /mcp
 ```
 
 ### 注意事项
 
-- 确保 OpenAPI 定义文件格式正确
+- 确保 OpenAPI 文档格式正确
 - API Host URL 必须是有效的 HTTPS/HTTP URL
 - 所有必需参数都必须提供
 - 请求和响应的 Content-Type 默认为 application/json
-- 可以通过访问 `/mcp-config` 端点查看生成的 MCP 工具配置
+- 可以通过访问 `/mcp-config` 端点查看加载的 MCP 工具配置
