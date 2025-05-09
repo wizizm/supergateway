@@ -66,11 +66,11 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
 
   onSignals({ logger })
 
-  // 连接到SSE服务器
+  // Connect to SSE server
   const client = new Client({ name: 'supergateway', version: getVersion() })
   const sseTransport = new SSEClientTransport(new URL(sseUrl), {
     requestInit: { headers },
-    eventSourceInit: {}, // EventSource不支持自定义headers
+    eventSourceInit: {}, // EventSource does not support custom headers
   })
 
   try {
@@ -81,10 +81,10 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
     process.exit(1)
   }
 
-  // 会话存储
+  // Session storage
   const sessions = new Map<string, Session>()
 
-  // 设置Express应用
+  // Set up Express application
   const app = express()
 
   if (corsOrigin) {
@@ -93,7 +93,7 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
 
   app.use(bodyParser.json())
 
-  // 注册健康检查端点
+  // Register health check endpoints
   for (const ep of healthEndpoints) {
     app.get(ep, (_req, res) => {
       setResponseHeaders({
@@ -104,15 +104,15 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
     })
   }
 
-  // 注册Streamable HTTP处理程序
+  // Register Streamable HTTP handler
   app.all(httpPath, async (req, res) => {
-    // 设置自定义响应头
+    // Set custom response headers
     setResponseHeaders({
       res,
       headers,
     })
 
-    // 从请求头获取会话ID
+    // Get session ID from request headers
     const sessionId =
       (req.headers['mcp-session-id'] as string) || crypto.randomUUID()
     logger.info(`Handling request with session ID: ${sessionId} from ${req.ip}`)
@@ -120,12 +120,12 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
     logger.info(`Request body: ${JSON.stringify(req.body)}`)
 
     try {
-      // 检查会话是否已存在
+      // Check if session already exists
       let session = sessions.get(sessionId)
 
       if (!session) {
         logger.info(`Creating new session for ${sessionId}`)
-        // 为新会话创建服务器实例
+        // Create server instance for new session
         const server = new Server(
           { name: 'supergateway', version: getVersion() },
           { capabilities: {} },
@@ -135,7 +135,7 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
           sessionIdGenerator: () => sessionId,
         })
 
-        // 存储会话
+        // Store session
         session = {
           transport,
           server,
@@ -146,27 +146,27 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
           `Created new session ${sessionId}, total active sessions: ${sessions.size}`,
         )
 
-        // 连接服务器和传输
+        // Connect server and transport
         await server.connect(transport)
         logger.info(`Server connected for session ${sessionId}`)
 
-        // 设置消息处理
+        // Set up message handling
         transport.onmessage = async (msg: JSONRPCMessage) => {
           logger.info(
             `StreamableHTTP → SSE (session ${sessionId}): ${JSON.stringify(msg)}`,
           )
           try {
-            // 检查消息类型，通过Client接口转发请求而不是直接使用传输层
+            // Check message type, forward requests through Client interface instead of directly using transport layer
             if ('method' in msg && 'id' in msg) {
-              // 请求消息
+              // Request message
               const method = msg.method
               const params = (msg as any).params || {}
 
-              // 使用client接口发送请求
+              // Use client interface to send requests
               let response: any
               switch (method) {
                 case 'initialize':
-                  // 初始化请求 - 返回SSE服务器的能力
+                  // Initialize request - return SSE server's capabilities
                   const serverCapabilities =
                     client.getServerCapabilities() || {}
                   const serverInfo = client.getServerVersion() || {
@@ -184,7 +184,7 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
                   }
                   break
                 case 'tools/list':
-                  // 工具列表请求
+                  // Tools list request
                   const toolsResult = await client.listTools()
                   response = {
                     jsonrpc: '2.0',
@@ -193,7 +193,7 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
                   }
                   break
                 case 'tools/call':
-                  // 工具调用请求
+                  // Tool call request
                   const callResult = await client.callTool({
                     name: params.name,
                     arguments: params.arguments,
@@ -205,7 +205,7 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
                   }
                   break
                 case 'resources/list':
-                  // 资源列表请求
+                  // Resources list request
                   const resourcesResult = await client.listResources()
                   response = {
                     jsonrpc: '2.0',
@@ -214,7 +214,7 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
                   }
                   break
                 case 'resources/read':
-                  // 资源读取请求
+                  // Resource read request
                   const readResult = await client.readResource({
                     uri: params.uri,
                   })
@@ -225,7 +225,7 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
                   }
                   break
                 default:
-                  // 对于其他请求，返回方法未找到错误
+                  // For other requests, return method not found error
                   response = {
                     jsonrpc: '2.0',
                     id: msg.id,
@@ -236,23 +236,23 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
                   }
               }
 
-              // 记录待处理请求
+              // Record pending request
               session.pendingResponses.set(msg.id, msg)
               logger.info(
                 `Recorded pending request ${msg.id} for session ${sessionId}`,
               )
 
-              // 将响应发送回Streamable HTTP客户端
+              // Send response back to Streamable HTTP client
               transport.send(response)
               session.pendingResponses.delete(msg.id)
               logger.info(
                 `Response sent and request ${msg.id} cleared for session ${sessionId}`,
               )
             } else if ('method' in msg && !('id' in msg)) {
-              // 通知消息，不需要响应
+              // Notification message, no response needed
               logger.info(`Notification message: ${msg.method}`)
             } else {
-              // 未知消息类型
+              // Unknown message type
               logger.error(`Unknown message type: ${JSON.stringify(msg)}`)
             }
           } catch (err) {
@@ -289,7 +289,7 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
         logger.info(`Reusing existing session ${sessionId}`)
       }
 
-      // 使用handleRequest方法处理请求
+      // Use handleRequest method to process the request
       logger.info(`Handling request for session ${sessionId}`)
       await session.transport.handleRequest(req, res, req.body)
       logger.info(`Request handled for session ${sessionId}`)
@@ -308,27 +308,27 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
 
     req.on('close', () => {
       logger.info(`Client disconnected (session ${sessionId})`)
-      // 不要在请求结束时删除会话，因为同一个会话ID可能会继续使用
+      // Don't delete session when request ends, as the same session ID may continue to be used
       logger.info(
         `Request closed for session ${sessionId}, total active sessions: ${sessions.size}`,
       )
     })
   })
 
-  // 启动服务器
+  // Start server
   app.listen(port, () => {
     logger.info(`Listening on port ${port}`)
     logger.info(`Streamable HTTP endpoint: http://localhost:${port}${httpPath}`)
   })
 
-  // 处理SSE服务器发送的通知消息
+  // Handle notification messages sent by SSE server
   const originalOnMessage = sseTransport.onmessage
   sseTransport.onmessage = (msg: JSONRPCMessage) => {
-    // 如果是通知消息，广播给所有会话
+    // If it's a notification message, broadcast to all sessions
     if ('method' in msg && !('id' in msg)) {
       logger.info(`SSE notification → StreamableHTTP: ${JSON.stringify(msg)}`)
       try {
-        // 广播通知给所有活动会话
+        // Broadcast notification to all active sessions
         for (const [sid, session] of sessions.entries()) {
           try {
             session.transport.send(msg)
@@ -344,19 +344,19 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
       }
     }
 
-    // 调用原始的onmessage处理程序
+    // Call the original onmessage handler
     if (originalOnMessage) {
       originalOnMessage(msg)
     }
   }
 
-  // 处理SSE连接错误
+  // Handle SSE connection errors
   sseTransport.onerror = (error) => {
     logger.error(`SSE connection error: ${error}`)
     process.exit(1)
   }
 
-  // 处理SSE连接关闭
+  // Handle SSE connection closure
   sseTransport.onclose = () => {
     logger.error('SSE connection closed')
     process.exit(1)

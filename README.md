@@ -239,17 +239,14 @@ npx -y supergateway \
 
 ## Docker Support
 
-SuperGateway's Docker image supports all gateway types for seamless protocol conversion in containerized environments.
+SuperGateway is available as a Docker image, making it easy to run without installing Node.js locally.
 
-### Using the Official Image
+### Docker Image
 
-```bash
-docker run -it --rm -p 8000:8000 supercorp/supergateway \
-    --stdio "npx -y @modelcontextprotocol/server-filesystem /" \
-    --port 8000
-```
+Available on Docker Hub: [supercorp/supergateway](https://hub.docker.com/r/supercorp/supergateway)  
+Also on GitHub Container Registry: [ghcr.io/supercorp-ai/supergateway](https://github.com/supercorp-ai/supergateway/pkgs/container/supergateway)
 
-### Gateway Examples with Docker
+### Docker Examples for All Gateway Types
 
 #### stdio → SSE
 
@@ -257,14 +254,6 @@ docker run -it --rm -p 8000:8000 supercorp/supergateway \
 docker run -it --rm -p 8000:8000 supercorp/supergateway \
     --stdio "npx -y @modelcontextprotocol/server-filesystem /" \
     --port 8000 --ssePath /sse --messagePath /message
-```
-
-#### stdio → WebSocket
-
-```bash
-docker run -it --rm -p 8000:8000 supercorp/supergateway \
-    --stdio "npx -y @modelcontextprotocol/server-filesystem /" \
-    --port 8000 --outputTransport ws --messagePath /message
 ```
 
 #### stdio → Streamable HTTP
@@ -275,11 +264,20 @@ docker run -it --rm -p 8000:8000 supercorp/supergateway \
     --outputTransport streamable-http --port 8000 --httpPath /mcp
 ```
 
+#### stdio → WS
+
+```bash
+docker run -it --rm -p 8000:8000 supercorp/supergateway \
+    --stdio "npx -y @modelcontextprotocol/server-filesystem /" \
+    --outputTransport ws --port 8000 --messagePath /message
+```
+
 #### SSE → stdio
 
 ```bash
 docker run -it --rm supercorp/supergateway \
-    --sse "https://mcp-server-example.supermachine.app"
+    --sse "https://mcp-server-example.supermachine.app" \
+    --outputTransport stdio
 ```
 
 #### SSE → Streamable HTTP
@@ -294,7 +292,7 @@ docker run -it --rm -p 8000:8000 supercorp/supergateway \
 
 ```bash
 docker run -it --rm -p 8000:8000 supercorp/supergateway \
-    --api /app/openapi.json --apiHost https://api.example.com \
+    --api /path/to/openapi.json --apiHost https://api.example.com \
     --outputTransport sse --port 8000 --ssePath /sse --messagePath /message
 ```
 
@@ -302,21 +300,19 @@ docker run -it --rm -p 8000:8000 supercorp/supergateway \
 
 ```bash
 docker run -it --rm -p 8000:8000 supercorp/supergateway \
-    --api /app/openapi.json --apiHost https://api.example.com \
+    --api /path/to/openapi.json --apiHost https://api.example.com \
     --outputTransport streamable-http --port 8000 --httpPath /mcp
 ```
 
-### Using Docker with Host Volumes
+### Volume Mounting
 
-Mount your local directories to access files inside the container:
+To provide files from your host system:
 
 ```bash
-docker run -it --rm -p 8000:8000 -v $(pwd):/data supercorp/supergateway \
-    --stdio "npx -y @modelcontextprotocol/server-filesystem /data" \
+docker run -it --rm -p 8000:8000 -v $(pwd):/workspace supercorp/supergateway \
+    --stdio "npx -y @modelcontextprotocol/server-filesystem /workspace" \
     --port 8000
 ```
-
-This mounts your current directory to `/data` inside the container.
 
 ### Building the Image Yourself
 
