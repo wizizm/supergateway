@@ -96,17 +96,35 @@ export async function stdioToStreamableHttp(args: StdioToStreamableHttpArgs) {
       if (!childReady) {
         reject(new Error('Child process failed to initialize within timeout'))
       }
-    }, 30000) // 30秒超时
+    }, 120000) // 增加到120秒超时 (从原来的30秒)
 
-    child.stdout.once('data', () => {
-      childReady = true
-      clearTimeout(timeout)
-      resolve(true)
+    // 增加调试输出
+    child.stdout.on('data', (data) => {
+      logger.info(`Child process stdout: ${data.toString()}`)
+      if (!childReady) {
+        childReady = true
+        clearTimeout(timeout)
+        resolve(true)
+      }
+    })
+
+    child.stderr.on('data', (data) => {
+      logger.error(`Child process stderr: ${data.toString()}`)
     })
   })
 
   child.on('spawn', () => {
     logger.info('Child process spawned successfully')
+
+    // 发送一个测试消息到子进程，尝试激活它
+    try {
+      logger.info('Sending test message to child process...')
+      child.stdin.write(
+        JSON.stringify({ jsonrpc: '2.0', method: 'tools/list', id: 1 }) + '\n',
+      )
+    } catch (error) {
+      logger.error('Failed to send test message to child process:', error)
+    }
   })
 
   child.on('exit', (code, signal) => {

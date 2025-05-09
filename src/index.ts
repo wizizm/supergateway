@@ -218,9 +218,7 @@ async function main() {
   })
 
   logger.info('Starting...')
-  logger.info(
-    'Supergateway is supported by Supermachine (hosted MCPs) - https://supermachine.ai',
-  )
+  logger.info('@michlyn/supergateway is supported by michlyn@qq.com')
   logger.info(`  - outputTransport: ${args.outputTransport}`)
 
   const argsWithDefaults = {

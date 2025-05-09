@@ -37,7 +37,7 @@ Supported by [Supermachine](https://supermachine.ai) (hosted MCPs), [Superinterf
 Run SuperGateway via `npx`:
 
 ```bash
-npx -y supergateway --stdio "uvx mcp-server-git"
+npx -y @michlyn/supergateway --stdio "uvx mcp-server-git"
 ```
 
 ### Common Options
@@ -71,7 +71,7 @@ npx -y supergateway --stdio "uvx mcp-server-git"
 Expose an MCP stdio server as an SSE server:
 
 ```bash
-npx -y supergateway \
+npx -y @michlyn/supergateway \
     --stdio "npx -y @modelcontextprotocol/server-filesystem ./my-folder" \
     --port 8000 --baseUrl http://localhost:8000 \
     --ssePath /sse --messagePath /message
@@ -85,7 +85,7 @@ npx -y supergateway \
 Expose an MCP stdio server as a Streamable HTTP server:
 
 ```bash
-npx -y supergateway \
+npx -y @michlyn/supergateway \
     --stdio "npx -y @modelcontextprotocol/server-filesystem ./my-folder" \
     --port 8000 --baseUrl http://localhost:8000 \
     --outputTransport streamable-http --httpPath /mcp
@@ -98,13 +98,13 @@ npx -y supergateway \
 Connect to a remote SSE server and expose locally via stdio:
 
 ```bash
-npx -y supergateway --sse "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"
+npx -y @michlyn/supergateway --sse "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"
 ```
 
 You can add authentication headers:
 
 ```bash
-npx -y supergateway \
+npx -y @michlyn/supergateway \
     --sse "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app" \
     --oauth2Bearer "some-access-token" \
     --header "X-My-Header: another-header-value"
@@ -115,7 +115,7 @@ npx -y supergateway \
 Convert a remote SSE MCP server to Streamable HTTP:
 
 ```bash
-npx -y supergateway \
+npx -y @michlyn/supergateway \
     --sse "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app" \
     --outputTransport streamable-http --port 8000 --httpPath /mcp
 ```
@@ -127,7 +127,7 @@ npx -y supergateway \
 Expose an MCP stdio server as a WebSocket server:
 
 ```bash
-npx -y supergateway \
+npx -y @michlyn/supergateway \
     --stdio "npx -y @modelcontextprotocol/server-filesystem ./my-folder" \
     --port 8000 --outputTransport ws --messagePath /message
 ```
@@ -140,12 +140,12 @@ Convert an OpenAPI specification to an MCP server:
 
 ```bash
 # Using Streamable HTTP
-npx -y supergateway \
+npx -y @michlyn/supergateway \
     --api ./openapi.json --apiHost https://api.example.com \
     --outputTransport streamable-http --port 8000 --httpPath /mcp
 
 # Using SSE
-npx -y supergateway \
+npx -y @michlyn/supergateway \
     --api ./openapi.json --apiHost https://api.example.com \
     --outputTransport sse --port 8000 --ssePath /sse --messagePath /message
 ```
@@ -161,7 +161,7 @@ SuperGateway includes a standalone tool to convert OpenAPI documents to MCP temp
 
 ```bash
 # Using npx
-npx -y supergateway openapi-to-mcp --input openapi.json --output mcp-template.json
+npx -y @michlyn/supergateway openapi-to-mcp --input openapi.json --output mcp-template.json
 
 # Or use the direct command
 openapi-to-mcp --input openapi.json --output mcp-template.json
@@ -184,7 +184,7 @@ openapi-to-mcp --input openapi.json --output mcp-template.json
 1. Run SuperGateway:
 
 ```bash
-npx -y supergateway --port 8000 \
+npx -y @michlyn/supergateway --port 8000 \
     --stdio "npx -y @modelcontextprotocol/server-filesystem /Users/MyName/Desktop"
 ```
 
@@ -205,7 +205,7 @@ Cursor can integrate with SuperGateway in SSE→stdio mode:
       "command": "npx",
       "args": [
         "-y",
-        "supergateway",
+        "@michlyn/supergateway",
         "--sse",
         "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"
       ]
@@ -232,7 +232,7 @@ Cursor can use SuperGateway's stdio→Streamable HTTP mode:
 Run SuperGateway on your local machine:
 
 ```bash
-npx -y supergateway \
+npx -y @michlyn/supergateway \
     --stdio "npx -y @modelcontextprotocol/server-filesystem ./my-folder" \
     --outputTransport streamable-http --port 8000 --httpPath /mcp
 ```
@@ -334,7 +334,7 @@ docker run -it --rm -p 8000:8000 supergateway \
 Share your local MCP server publicly:
 
 ```bash
-npx -y supergateway --port 8000 --stdio "npx -y @modelcontextprotocol/server-filesystem ."
+npx -y @michlyn/supergateway --port 8000 --stdio "npx -y @modelcontextprotocol/server-filesystem ."
 
 # In another terminal:
 ngrok http 8000
