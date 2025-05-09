@@ -1,4 +1,4 @@
-![Supergateway: Run stdio MCP servers over SSE and WS](https://raw.githubusercontent.com/supercorp-ai/supergateway/main/supergateway.png)
+### Enhanced version of https://github.com/supercorp-ai/supergateway, adding streamablehttp support and the ability to run MCP services based on both OpenAPI protocol interface documentation and [higress MCP template files](https://github.com/higress-group/openapi-to-mcpserver).
 
 # SuperGateway
 
@@ -37,7 +37,7 @@ Supported by [Supermachine](https://supermachine.ai) (hosted MCPs), [Superinterf
 Run SuperGateway via `npx`:
 
 ```bash
-npx -y @michlyn/supergateway --stdio "uvx mcp-server-git"
+npx -y @gfsopen/supergateway --stdio "uvx mcp-server-git"
 ```
 
 ### Common Options
@@ -71,7 +71,7 @@ npx -y @michlyn/supergateway --stdio "uvx mcp-server-git"
 Expose an MCP stdio server as an SSE server:
 
 ```bash
-npx -y @michlyn/supergateway \
+npx -y @gfsopen/supergateway \
     --stdio "npx -y @modelcontextprotocol/server-filesystem ./my-folder" \
     --port 8000 --baseUrl http://localhost:8000 \
     --ssePath /sse --messagePath /message
@@ -85,7 +85,7 @@ npx -y @michlyn/supergateway \
 Expose an MCP stdio server as a Streamable HTTP server:
 
 ```bash
-npx -y @michlyn/supergateway \
+npx -y @gfsopen/supergateway \
     --stdio "npx -y @modelcontextprotocol/server-filesystem ./my-folder" \
     --port 8000 --baseUrl http://localhost:8000 \
     --outputTransport streamable-http --httpPath /mcp
@@ -98,13 +98,13 @@ npx -y @michlyn/supergateway \
 Connect to a remote SSE server and expose locally via stdio:
 
 ```bash
-npx -y @michlyn/supergateway --sse "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"
+npx -y @gfsopen/supergateway --sse "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"
 ```
 
 You can add authentication headers:
 
 ```bash
-npx -y @michlyn/supergateway \
+npx -y @gfsopen/supergateway \
     --sse "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app" \
     --oauth2Bearer "some-access-token" \
     --header "X-My-Header: another-header-value"
@@ -115,7 +115,7 @@ npx -y @michlyn/supergateway \
 Convert a remote SSE MCP server to Streamable HTTP:
 
 ```bash
-npx -y @michlyn/supergateway \
+npx -y @gfsopen/supergateway \
     --sse "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app" \
     --outputTransport streamable-http --port 8000 --httpPath /mcp
 ```
@@ -127,7 +127,7 @@ npx -y @michlyn/supergateway \
 Expose an MCP stdio server as a WebSocket server:
 
 ```bash
-npx -y @michlyn/supergateway \
+npx -y @gfsopen/supergateway \
     --stdio "npx -y @modelcontextprotocol/server-filesystem ./my-folder" \
     --port 8000 --outputTransport ws --messagePath /message
 ```
@@ -140,12 +140,12 @@ Convert an OpenAPI specification to an MCP server:
 
 ```bash
 # Using Streamable HTTP
-npx -y @michlyn/supergateway \
+npx -y @gfsopen/supergateway \
     --api ./openapi.json --apiHost https://api.example.com \
     --outputTransport streamable-http --port 8000 --httpPath /mcp
 
 # Using SSE
-npx -y @michlyn/supergateway \
+npx -y @gfsopen/supergateway \
     --api ./openapi.json --apiHost https://api.example.com \
     --outputTransport sse --port 8000 --ssePath /sse --messagePath /message
 ```
@@ -161,7 +161,7 @@ SuperGateway includes a standalone tool to convert OpenAPI documents to MCP temp
 
 ```bash
 # Using npx
-npx -y @michlyn/supergateway openapi-to-mcp --input openapi.json --output mcp-template.json
+npx -y @gfsopen/supergateway openapi-to-mcp --input openapi.json --output mcp-template.json
 
 # Or use the direct command
 openapi-to-mcp --input openapi.json --output mcp-template.json
@@ -184,7 +184,7 @@ openapi-to-mcp --input openapi.json --output mcp-template.json
 1. Run SuperGateway:
 
 ```bash
-npx -y @michlyn/supergateway --port 8000 \
+npx -y @gfsopen/supergateway --port 8000 \
     --stdio "npx -y @modelcontextprotocol/server-filesystem /Users/MyName/Desktop"
 ```
 
@@ -205,7 +205,7 @@ Cursor can integrate with SuperGateway in SSE→stdio mode:
       "command": "npx",
       "args": [
         "-y",
-        "@michlyn/supergateway",
+        "@gfsopen/supergateway",
         "--sse",
         "https://mcp-server-ab71a6b2-cd55-49d0-adba-562bc85956e3.supermachine.app"
       ]
@@ -232,7 +232,7 @@ Cursor can use SuperGateway's stdio→Streamable HTTP mode:
 Run SuperGateway on your local machine:
 
 ```bash
-npx -y @michlyn/supergateway \
+npx -y @gfsopen/supergateway \
     --stdio "npx -y @modelcontextprotocol/server-filesystem ./my-folder" \
     --outputTransport streamable-http --port 8000 --httpPath /mcp
 ```
@@ -334,7 +334,7 @@ docker run -it --rm -p 8000:8000 supergateway \
 Share your local MCP server publicly:
 
 ```bash
-npx -y @michlyn/supergateway --port 8000 --stdio "npx -y @modelcontextprotocol/server-filesystem ."
+npx -y @gfsopen/supergateway --port 8000 --stdio "npx -y @modelcontextprotocol/server-filesystem ."
 
 # In another terminal:
 ngrok http 8000

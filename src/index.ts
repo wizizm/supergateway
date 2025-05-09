@@ -218,7 +218,7 @@ async function main() {
   })
 
   logger.info('Starting...')
-  logger.info('@michlyn/supergateway is supported by michlyn@qq.com')
+  logger.info('@gfsopen/supergateway is supported by gflinwenjie@qq.com')
   logger.info(`  - outputTransport: ${args.outputTransport}`)
 
   const argsWithDefaults = {
