@@ -8,8 +8,6 @@
 2. Converting **OpenAPI 3.0.1** interface definitions to **MCP tools**
 3. Providing seamless interoperability between different MCP transport protocols
 
-Supported by [Supermachine](https://supermachine.ai) (hosted MCPs), [Superinterface](https://superinterface.ai), and [Supercorp](https://supercorp.ai).
-
 ## Key Features
 
 ### Protocol Conversion
@@ -243,15 +241,14 @@ SuperGateway is available as a Docker image, making it easy to run without insta
 
 ### Docker Image
 
-Available on Docker Hub: [supercorp/supergateway](https://hub.docker.com/r/supercorp/supergateway)  
-Also on GitHub Container Registry: [ghcr.io/supercorp-ai/supergateway](https://github.com/supercorp-ai/supergateway/pkgs/container/supergateway)
+Available on Docker Hub: [michlyn/supergateway](https://hub.docker.com/r/michlyn/supergateway)
 
 ### Docker Examples for All Gateway Types
 
 #### stdio → SSE
 
 ```bash
-docker run -it --rm -p 8000:8000 supercorp/supergateway \
+docker run -it --rm -p 8000:8000 michlyn/supergateway \
     --stdio "npx -y @modelcontextprotocol/server-filesystem /" \
     --port 8000 --ssePath /sse --messagePath /message
 ```
@@ -259,7 +256,7 @@ docker run -it --rm -p 8000:8000 supercorp/supergateway \
 #### stdio → Streamable HTTP
 
 ```bash
-docker run -it --rm -p 8000:8000 supercorp/supergateway \
+docker run -it --rm -p 8000:8000 michlyn/supergateway \
     --stdio "npx -y @modelcontextprotocol/server-filesystem /" \
     --outputTransport streamable-http --port 8000 --httpPath /mcp
 ```
@@ -267,7 +264,7 @@ docker run -it --rm -p 8000:8000 supercorp/supergateway \
 #### stdio → WS
 
 ```bash
-docker run -it --rm -p 8000:8000 supercorp/supergateway \
+docker run -it --rm -p 8000:8000 michlyn/supergateway \
     --stdio "npx -y @modelcontextprotocol/server-filesystem /" \
     --outputTransport ws --port 8000 --messagePath /message
 ```
@@ -275,7 +272,7 @@ docker run -it --rm -p 8000:8000 supercorp/supergateway \
 #### SSE → stdio
 
 ```bash
-docker run -it --rm supercorp/supergateway \
+docker run -it --rm michlyn/supergateway \
     --sse "https://mcp-server-example.supermachine.app" \
     --outputTransport stdio
 ```
@@ -283,7 +280,7 @@ docker run -it --rm supercorp/supergateway \
 #### SSE → Streamable HTTP
 
 ```bash
-docker run -it --rm -p 8000:8000 supercorp/supergateway \
+docker run -it --rm -p 8000:8000 michlyn/supergateway \
     --sse "https://mcp-server-example.supermachine.app" \
     --outputTransport streamable-http --port 8000 --httpPath /mcp
 ```
@@ -291,7 +288,7 @@ docker run -it --rm -p 8000:8000 supercorp/supergateway \
 #### API → SSE
 
 ```bash
-docker run -it --rm -p 8000:8000 supercorp/supergateway \
+docker run -it --rm -p 8000:8000 michlyn/supergateway \
     --api /path/to/openapi.json --apiHost https://api.example.com \
     --outputTransport sse --port 8000 --ssePath /sse --messagePath /message
 ```
@@ -299,7 +296,7 @@ docker run -it --rm -p 8000:8000 supercorp/supergateway \
 #### API → Streamable HTTP
 
 ```bash
-docker run -it --rm -p 8000:8000 supercorp/supergateway \
+docker run -it --rm -p 8000:8000 michlyn/supergateway \
     --api /path/to/openapi.json --apiHost https://api.example.com \
     --outputTransport streamable-http --port 8000 --httpPath /mcp
 ```
@@ -309,7 +306,7 @@ docker run -it --rm -p 8000:8000 supercorp/supergateway \
 To provide files from your host system:
 
 ```bash
-docker run -it --rm -p 8000:8000 -v $(pwd):/workspace supercorp/supergateway \
+docker run -it --rm -p 8000:8000 -v $(pwd):/workspace michlyn/supergateway \
     --stdio "npx -y @modelcontextprotocol/server-filesystem /workspace" \
     --port 8000
 ```
@@ -332,12 +329,12 @@ docker run -it --rm -p 8000:8000 supergateway \
 ## Public Access with ngrok
 
 Share your local MCP server publicly:
-
-```bash
 npx -y @gfsopen/supergateway --port 8000 --stdio "npx -y @modelcontextprotocol/server-filesystem ."
 
 # In another terminal:
+
 ngrok http 8000
+
 ```
 
 The MCP server will be available at a URL similar to: https://1234-567-890-12-456.ngrok-free.app/sse
@@ -364,6 +361,7 @@ The Streamable HTTP transport is the latest MCP standard, offering improved perf
 - [@Areo-Joe](https://github.com/Areo-Joe)
 - [@Joffref](https://github.com/Joffref)
 - [@michaeljguarino](https://github.com/michaeljguarino)
+- [@michaelyn](https://github.com/wizizm)
 
 ## Contributing
 
@@ -372,3 +370,4 @@ Issues and PRs welcome. Please open one if you encounter problems or have featur
 ## License
 
 [MIT License](./LICENSE)
+```
