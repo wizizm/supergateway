@@ -25,7 +25,7 @@ interface ApiToSseArgs {
   logger: Logger
 }
 
-// MCP工具参数
+// MCP tool parameters
 interface ToolArg {
   name: string
   description: string
@@ -34,19 +34,19 @@ interface ToolArg {
   position: 'path' | 'query' | 'body' | 'header'
 }
 
-// MCP工具请求模板
+// MCP request template
 interface RequestTemplate {
   url: string
   method: string
   headers?: Array<{ key: string; value: string }>
 }
 
-// MCP工具响应模板
+// MCP response template
 interface ResponseTemplate {
   prependBody?: string
 }
 
-// MCP工具定义
+// MCP tool definition
 interface McpTool {
   name: string
   description: string
@@ -55,7 +55,7 @@ interface McpTool {
   responseTemplate: ResponseTemplate
 }
 
-// MCP服务器配置
+// MCP server configuration
 interface McpTemplate {
   server: {
     name: string
@@ -64,7 +64,7 @@ interface McpTemplate {
   tools: McpTool[]
 }
 
-// 将CORS源序列化为正确的格式
+// Format CORS origin into the correct format
 function formatCorsOrigin(
   origin: any,
 ): string | RegExp | (string | RegExp)[] | undefined {
@@ -86,67 +86,71 @@ function formatCorsOrigin(
 }
 
 /**
- * 加载MCP模板文件
- * 如果是OpenAPI规范，则自动转换为MCP模板
+ * Load MCP template file
+ * If it's an OpenAPI specification, automatically convert it to MCP template
  */
 async function loadMcpTemplate(
   templatePath: string,
   logger: Logger,
 ): Promise<McpTemplate> {
   try {
-    logger.info(`加载文件: ${templatePath}`)
+    logger.info(`Loading file: ${templatePath}`)
 
     try {
       await fs.access(templatePath)
     } catch (err) {
-      logger.error(`文件不存在: ${templatePath}`)
-      throw new Error(`文件不存在: ${templatePath}`)
+      logger.error(`File does not exist: ${templatePath}`)
+      throw new Error(`File does not exist: ${templatePath}`)
     }
 
-    // 读取文件内容
+    // Read file content
     const fileContent = await fs.readFile(templatePath, 'utf-8')
     let template: McpTemplate | null = null
     let isOpenApi = false
 
-    // 尝试解析文件
+    // Try to parse the file
     try {
-      // 根据文件扩展名决定解析方式
+      // Choose parsing method based on file extension
       const parsedContent = templatePath.endsWith('.json')
         ? JSON.parse(fileContent)
         : yaml.load(fileContent)
 
-      // 检查是否为OpenAPI规范
+      // Check if it's an OpenAPI specification
       if (parsedContent && typeof parsedContent === 'object') {
-        // OpenAPI规范有openapi字段
+        // OpenAPI specification has an openapi field
         if (parsedContent.openapi && parsedContent.paths) {
-          logger.info(`检测到OpenAPI规范文档，版本: ${parsedContent.openapi}`)
+          logger.info(
+            `Detected OpenAPI specification, version: ${parsedContent.openapi}`,
+          )
           isOpenApi = true
         }
-        // MCP模板有server和tools字段
+        // MCP template has server and tools fields
         else if (parsedContent.server && parsedContent.tools) {
-          logger.info('检测到MCP模板文档')
+          logger.info('Detected MCP template document')
           template = parsedContent as McpTemplate
         }
-        // 不符合任何已知格式
+        // Doesn't match any known format
         else {
-          logger.warn('文档格式无法识别，尝试作为MCP模板处理')
+          logger.warn(
+            'Document format not recognized, trying to process as MCP template',
+          )
           template = parsedContent as McpTemplate
         }
       }
     } catch (parseError) {
-      logger.error(`解析文件失败: ${parseError.message}`, parseError)
-      throw new Error(`解析文件失败: ${parseError.message}`)
+      logger.error(`Failed to parse file: ${parseError.message}`, parseError)
+      throw new Error(`Failed to parse file: ${parseError.message}`)
     }
 
-    // 如果是OpenAPI规范，转换为MCP模板
+    // If it's an OpenAPI specification, convert to MCP template
     if (isOpenApi) {
       try {
-        logger.info('正在将OpenAPI规范转换为MCP模板...')
+        logger.info('Converting OpenAPI specification to MCP template...')
         const { convertOpenApiToMcpServer } = await import(
           '../lib/openapi-to-mcpserver/index.js'
         )
 
-        // 转换OpenAPI到MCP模板
+        // Convert OpenAPI to MCP template
         const mcpTemplateContent = await convertOpenApiToMcpServer(
           { input: templatePath },
           {},
@@ -154,29 +158,33 @@ async function loadMcpTemplate(
           logger,
         )
 
-        // 解析生成的模板
+        // Parse the generated template
         if (templatePath.endsWith('.json')) {
           template = JSON.parse(mcpTemplateContent) as McpTemplate
         } else {
           template = yaml.load(mcpTemplateContent) as McpTemplate
         }
 
-        logger.info('OpenAPI规范成功转换为MCP模板')
+        logger.info(
+          'OpenAPI specification successfully converted to MCP template',
+        )
       } catch (conversionError) {
         logger.error(
-          `OpenAPI规范转换失败: ${conversionError.message}`,
+          `OpenAPI specification conversion failed: ${conversionError.message}`,
           conversionError,
         )
-        throw new Error(`OpenAPI规范转换失败: ${conversionError.message}`)
+        throw new Error(
+          `OpenAPI specification conversion failed: ${conversionError.message}`,
+        )
       }
     }
 
-    // 确保template不为空并包含必要字段
+    // Ensure template is not null and contains necessary fields
     if (!template) {
-      throw new Error('无法从文件创建有效的MCP模板')
+      throw new Error('Unable to create a valid MCP template from file')
     }
 
-    // 确保模板有必要的字段
+    // Ensure template has necessary fields
     if (!template.server) {
       template.server = { name: 'API Gateway' }
     }
@@ -185,16 +193,18 @@ async function loadMcpTemplate(
       template.tools = []
     }
 
-    logger.info(`MCP模板加载成功: 包含 ${template.tools.length} 个工具`)
+    logger.info(
+      `MCP template loaded successfully: contains ${template.tools.length} tools`,
+    )
     return template
   } catch (error) {
-    logger.error(`加载MCP模板失败: ${error.message}`, error)
+    logger.error(`Failed to load MCP template: ${error.message}`, error)
     throw error
   }
 }
 
 /**
- * 处理MCP请求
+ * Handle MCP request
  */
 async function handleMcpRequest(
   req: express.Request,
@@ -214,7 +224,7 @@ async function handleMcpRequest(
       }
     }
 
-    // 获取工具配置
+    // Get tool configuration
     const tool = req.body.metadata?.tool
 
     if (!tool) {
@@ -224,7 +234,7 @@ async function handleMcpRequest(
       }
     }
 
-    // 构建请求URL
+    // Build request URL
     const apiPath = tool.requestTemplate?.url || ''
     if (!apiPath) {
       return {
@@ -233,7 +243,7 @@ async function handleMcpRequest(
       }
     }
 
-    // 解析路径参数
+    // Parse path parameters
     let processedPath = apiPath
     const pathParams =
       tool.args?.filter((arg: ToolArg) => arg.position === 'path') || []
@@ -251,7 +261,7 @@ async function handleMcpRequest(
       }
     })
 
-    // 创建完整的URL（处理相对路径）
+    // Create complete URL (handle relative paths)
     let url = processedPath
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url =
@@ -260,7 +270,7 @@ async function handleMcpRequest(
         processedPath.replace(/^\//, '')
     }
 
-    // 构建查询参数
+    // Build query parameters
     const queryParams =
       tool.args?.filter((arg: ToolArg) => arg.position === 'query') || []
     if (queryParams.length > 0) {
@@ -281,20 +291,20 @@ async function handleMcpRequest(
       }
     }
 
-    // 获取请求方法
+    // Get request method
     const method = (tool.requestTemplate?.method || 'GET').toUpperCase()
 
-    // 构建请求头
+    // Build request headers
     const requestHeaders: Record<string, string> = { ...headers }
 
-    // 添加工具模板中定义的请求头
+    // Add headers defined in the tool template
     if (
       tool.requestTemplate?.headers &&
       Array.isArray(tool.requestTemplate.headers)
     ) {
       tool.requestTemplate.headers.forEach((header) => {
         if (header.key && header.value !== undefined) {
-          // 支持UUID模板变量
+          // Support UUID template variable
           let value = header.value
           value = value.replace('{{uuidv4}}', randomUUID())
           requestHeaders[header.key] = value
@@ -302,7 +312,7 @@ async function handleMcpRequest(
       })
     }
 
-    // 添加header参数
+    // Add header parameters
     const headerParams =
       tool.args?.filter((arg: ToolArg) => arg.position === 'header') || []
     headerParams.forEach((param: ToolArg) => {
@@ -315,7 +325,7 @@ async function handleMcpRequest(
       }
     })
 
-    // 处理请求体
+    // Process request body
     let requestBody = undefined
     const bodyParams =
       tool.args?.filter((arg: ToolArg) => arg.position === 'body') || []
@@ -337,11 +347,13 @@ async function handleMcpRequest(
       }
     }
 
-    // 发送请求到API服务器
-    logger.info(`[${sessionId}] 发送请求: ${method} ${url}`)
-    logger.info(`[${sessionId}] 请求头: ${JSON.stringify(requestHeaders)}`)
+    // Send request to API server
+    logger.info(`[${sessionId}] Sending request: ${method} ${url}`)
+    logger.info(
+      `[${sessionId}] Request headers: ${JSON.stringify(requestHeaders)}`,
+    )
     if (requestBody) {
-      logger.info(`[${sessionId}] 请求体: ${requestBody}`)
+      logger.info(`[${sessionId}] Request body: ${requestBody}`)
     }
 
     const response = await fetch(url, {
@@ -350,7 +362,7 @@ async function handleMcpRequest(
       body: requestBody,
     })
 
-    // 获取响应内容
+    // Get response content
     const contentType = response.headers.get('content-type') || ''
     let responseData: any
 
@@ -360,13 +372,13 @@ async function handleMcpRequest(
       responseData = await response.text()
     }
 
-    logger.info(`[${sessionId}] 响应状态: ${response.status}`)
-    logger.info(`[${sessionId}] 响应内容类型: ${contentType}`)
+    logger.info(`[${sessionId}] Response status: ${response.status}`)
+    logger.info(`[${sessionId}] Response content type: ${contentType}`)
     logger.info(
-      `[${sessionId}] 响应数据: ${JSON.stringify(responseData).substring(0, 1000)}${JSON.stringify(responseData).length > 1000 ? '...' : ''}`,
+      `[${sessionId}] Response data: ${JSON.stringify(responseData).substring(0, 1000)}${JSON.stringify(responseData).length > 1000 ? '...' : ''}`,
     )
 
-    // 处理响应模板（如果有）
+    // Process response template (if any)
     let formattedResponse = responseData
     if (
       tool.responseTemplate?.prependBody &&
@@ -380,15 +392,18 @@ async function handleMcpRequest(
       result: formattedResponse,
     }
   } catch (error) {
-    logger.error(`[${sessionId}] 请求处理失败: ${error.message}`, error)
+    logger.error(
+      `[${sessionId}] Request processing failed: ${error.message}`,
+      error,
+    )
     return {
       status: 500,
-      result: { error: `处理请求失败: ${error.message}` },
+      result: { error: `Request processing failed: ${error.message}` },
     }
   }
 }
 
-// 设置响应头
+// Set response headers
 const setResponseHeaders = ({
   res,
   headers,
@@ -400,19 +415,21 @@ const setResponseHeaders = ({
     res.setHeader(key, value)
   })
 
-// API到SSE网关
+// API to SSE gateway
 export const apiToSse = async (args: ApiToSseArgs) => {
   const { logger } = args
   const app = express()
 
-  logger.info(`初始化API->SSE网关配置:`)
-  logger.info(`- API主机: ${args.apiHost}`)
-  logger.info(`- 配置文件: ${args.mcpTemplateFile} (支持OpenAPI和MCP模板格式)`)
-  logger.info(`- 服务端口: ${args.port}`)
-  logger.info(`- SSE路径: ${args.ssePath}`)
-  logger.info(`- 消息路径: ${args.messagePath}`)
+  logger.info(`Initializing API->SSE gateway configuration:`)
+  logger.info(`- API host: ${args.apiHost}`)
+  logger.info(
+    `- Config file: ${args.mcpTemplateFile} (supports OpenAPI and MCP template formats)`,
+  )
+  logger.info(`- Server port: ${args.port}`)
+  logger.info(`- SSE path: ${args.ssePath}`)
+  logger.info(`- Message path: ${args.messagePath}`)
 
-  // 启用CORS，确保跨域请求正常工作
+  // Enable CORS to ensure cross-origin requests work correctly
   app.use(
     cors({
       origin: args.corsOrigin ? formatCorsOrigin(args.corsOrigin) : '*',
@@ -421,28 +438,28 @@ export const apiToSse = async (args: ApiToSseArgs) => {
     }),
   )
 
-  // 解析JSON请求体
+  // Parse JSON request body
   app.use((req, res, next) => {
     if (req.path === args.messagePath) return next()
     return bodyParser.json()(req, res, next)
   })
 
-  // 添加CORS预检请求处理
+  // Add CORS preflight request handler
   app.options('*', (req, res) => {
-    // 设置CORS响应头
+    // Set CORS response headers
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
     res.setHeader(
       'Access-Control-Allow-Headers',
       'Content-Type, Authorization, mcp-session-id, x-session-id, Accept, Origin, X-Requested-With',
     )
-    res.setHeader('Access-Control-Max-Age', '86400') // 24小时
+    res.setHeader('Access-Control-Max-Age', '86400') // 24 hours
     res.setHeader(
       'Access-Control-Expose-Headers',
       'mcp-session-id, x-session-id',
     )
 
-    // 如果有自定义头，也添加它们
+    // If there are custom headers, add them as well
     if (args.headers) {
       setResponseHeaders({
         res,
@@ -450,11 +467,11 @@ export const apiToSse = async (args: ApiToSseArgs) => {
       })
     }
 
-    // 返回成功状态
+    // Return success status
     res.status(204).end()
   })
 
-  // 添加运行状态检查路由
+  // Add health check routes
   app.get('/health', (req, res) => {
     res.send('ok')
   })
@@ -463,7 +480,7 @@ export const apiToSse = async (args: ApiToSseArgs) => {
     res.json({ status: 'running' })
   })
 
-  // 健康检查端点
+  // Health check endpoints
   const healthEndpoints = args.healthEndpoints || []
   for (const ep of healthEndpoints) {
     app.get(ep, (req, res) => {
@@ -477,30 +494,30 @@ export const apiToSse = async (args: ApiToSseArgs) => {
     })
   }
 
-  // 加载MCP模板
+  // Load MCP template
   let mcpTemplate: McpTemplate
   try {
     mcpTemplate = await loadMcpTemplate(args.mcpTemplateFile, logger)
   } catch (error) {
-    logger.error(`加载MCP模板失败: ${error.message}`)
+    logger.error(`Failed to load MCP template: ${error.message}`)
     throw error
   }
 
-  // 提供配置信息访问
+  // Provide configuration info access
   app.get('/mcp-config', (req, res) => {
     res.json(mcpTemplate)
   })
 
-  // 存储活动的SSE会话
+  // Store active SSE sessions
   const sessions: Record<
     string,
     { transport: SSEServerTransport; server: McpServer }
   > = {}
 
-  // SSE端点
+  // SSE endpoint
   app.get(args.ssePath, (req, res) => {
     ;(async () => {
-      logger.info(`新的SSE连接: ${req.ip}`)
+      logger.info(`New SSE connection: ${req.ip}`)
 
       if (args.headers) {
         setResponseHeaders({
@@ -510,15 +527,15 @@ export const apiToSse = async (args: ApiToSseArgs) => {
       }
 
       try {
-        // 从请求中获取会话ID或生成新ID
+        // Get session ID from request or generate new ID
         const sessionId =
           (req.headers['mcp-session-id'] as string) ||
           (req.headers['x-session-id'] as string) ||
           randomUUID()
 
-        logger.info(`使用会话ID: ${sessionId}`)
+        logger.info(`Using session ID: ${sessionId}`)
 
-        // 配置CORS头
+        // Configure CORS headers
         res.setHeader('Access-Control-Allow-Origin', '*')
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         res.setHeader(
@@ -530,62 +547,64 @@ export const apiToSse = async (args: ApiToSseArgs) => {
           'mcp-session-id, x-session-id',
         )
 
-        // 回传会话ID到客户端
+        // Pass session ID to client
         res.setHeader('mcp-session-id', sessionId)
         res.setHeader('x-session-id', sessionId)
 
-        // 创建SSE传输，在URL中明确包含会话ID以确保传输层使用正确的ID
+        // Create SSE transport, explicitly including session ID in URL to ensure transport layer uses correct ID
         const messagePath = `${args.messagePath}?sessionId=${sessionId}`
-        logger.info(`SSE消息路径: ${messagePath}`)
+        logger.info(`SSE message path: ${messagePath}`)
 
         const sseTransport = new SSEServerTransport(
           `${req.protocol}://${req.headers.host}${messagePath}`,
           res,
         )
 
-        // 创建MCP服务器，每个连接一个实例
+        // Create MCP server, one instance per connection
         const mcpServer = new McpServer({
           name: mcpTemplate.server.name,
           version: mcpTemplate.server.version || getVersion(),
         })
 
-        // 保存会话
+        // Save session
         sessions[sessionId] = {
           transport: sseTransport,
           server: mcpServer,
         }
 
-        logger.info(`已创建新会话: ${sessionId}`)
-        logger.info(`活动会话数量: ${Object.keys(sessions).length}`)
-        logger.info(`活动会话列表: ${Object.keys(sessions).join(', ')}`)
+        logger.info(`New session created: ${sessionId}`)
+        logger.info(`Active session count: ${Object.keys(sessions).length}`)
+        logger.info(`Active session list: ${Object.keys(sessions).join(', ')}`)
 
-        // 打印工具信息
-        logger.info(`注册 ${mcpTemplate.tools.length} 个工具:`)
+        // Print tool information
+        logger.info(`Registering ${mcpTemplate.tools.length} tools:`)
 
-        // 为每个工具注册处理函数
+        // Register tool processing function for each tool
         for (const tool of mcpTemplate.tools) {
-          logger.info(`注册工具: ${tool.name} (${tool.args.length} 个参数)`)
+          logger.info(
+            `Registering tool: ${tool.name} (${tool.args.length} parameters)`,
+          )
 
-          // 打印参数信息
+          // Print parameter information
           tool.args.forEach((arg) => {
             logger.info(
-              `  参数: ${arg.name} (${arg.type}) [${arg.position}] ${arg.required ? '必需' : '可选'}`,
+              `   Parameter: ${arg.name} (${arg.type}) [${arg.position}] ${arg.required ? 'Required' : 'Optional'}`,
             )
           })
 
-          // 注册工具
+          // Register tool
           mcpServer.tool(
             tool.name,
             tool.description,
-            // 构建参数验证对象
+            // Build parameter validation object
             (() => {
-              // 创建参数验证对象
+              // Create parameter validation object
               const paramSchema: Record<string, z.ZodType<any>> = {}
 
-              // 处理工具参数
+              // Process tool parameters
               if (tool.args && Array.isArray(tool.args)) {
                 for (const arg of tool.args) {
-                  // 根据参数类型设置正确的zod验证器
+                  // Choose correct zod validator based on parameter type
                   const paramType = (arg.type || 'string').toLowerCase()
 
                   try {
@@ -670,14 +689,17 @@ export const apiToSse = async (args: ApiToSseArgs) => {
                               .pipe(z.record(z.any()).optional())
                         break
                       default:
-                        // 默认当做字符串处理
+                        // Default to string processing
                         paramSchema[arg.name] = arg.required
                           ? z.string()
                           : z.string().optional()
                     }
                   } catch (error) {
-                    logger.error(`创建参数验证器失败: ${arg.name}`, error)
-                    // 如果出错，使用字符串作为降级方案
+                    logger.error(
+                      `Failed to create parameter validator: ${arg.name}`,
+                      error,
+                    )
+                    // If error, use string as fallback
                     paramSchema[arg.name] = arg.required
                       ? z.string()
                       : z.string().optional()
@@ -689,11 +711,11 @@ export const apiToSse = async (args: ApiToSseArgs) => {
             })(),
             async (toolParams) => {
               try {
-                // 记录工具参数信息
-                logger.info(`执行工具: ${tool.name}`)
-                logger.info(`传入参数: ${JSON.stringify(toolParams)}`)
+                // Record tool parameter information
+                logger.info(`Executing tool: ${tool.name}`)
+                logger.info(`Passed parameters: ${JSON.stringify(toolParams)}`)
 
-                // 构建请求使用的参数
+                // Build parameters to use for API request
                 const requestParams = {
                   name: tool.name,
                   args: toolParams,
@@ -702,7 +724,7 @@ export const apiToSse = async (args: ApiToSseArgs) => {
                   },
                 }
 
-                // 构造一个请求对象
+                // Construct a request object
                 const customReq = {
                   body: requestParams,
                   headers: req.headers,
@@ -710,7 +732,7 @@ export const apiToSse = async (args: ApiToSseArgs) => {
                   ip: req.ip,
                 }
 
-                // 处理API请求
+                // Handle API request
                 const result = await handleMcpRequest(
                   customReq as any,
                   res,
@@ -720,7 +742,7 @@ export const apiToSse = async (args: ApiToSseArgs) => {
                   logger,
                 )
 
-                // 格式化响应
+                // Format response
                 let responseText = ''
 
                 if (typeof result.result === 'string') {
@@ -729,16 +751,16 @@ export const apiToSse = async (args: ApiToSseArgs) => {
                   try {
                     responseText = JSON.stringify(result.result, null, 2)
                   } catch (error) {
-                    responseText = `无法序列化的结果: ${String(result.result)}`
+                    responseText = `Unable to serialize result: ${String(result.result)}`
                   }
                 }
 
-                // 记录响应信息
+                // Record response information
                 logger.info(
-                  `工具执行结果: ${responseText.length > 200 ? responseText.substring(0, 200) + '...' : responseText}`,
+                  `Tool execution result: ${responseText.length > 200 ? responseText.substring(0, 200) + '...' : responseText}`,
                 )
 
-                // 返回标准格式的响应
+                // Return standard format response
                 return {
                   content: [
                     {
@@ -749,14 +771,14 @@ export const apiToSse = async (args: ApiToSseArgs) => {
                 }
               } catch (error) {
                 logger.error(
-                  `工具执行出错 (${tool.name}): ${error.message}`,
+                  `Tool execution failed (${tool.name}): ${error.message}`,
                   error,
                 )
                 return {
                   content: [
                     {
                       type: 'text',
-                      text: `执行工具时出错: ${error.message}`,
+                      text: `Execution failed: ${error.message}`,
                     },
                   ],
                 }
@@ -765,57 +787,67 @@ export const apiToSse = async (args: ApiToSseArgs) => {
           )
         }
 
-        // 连接传输
+        // Connect transport
         try {
           await mcpServer.connect(sseTransport)
-          logger.info(`已建立SSE会话连接: ${sessionId}`)
+          logger.info(`SSE session connection established: ${sessionId}`)
         } catch (error) {
-          logger.error(`建立SSE会话连接失败: ${error.message}`, error)
+          logger.error(
+            `Failed to establish SSE session connection: ${error.message}`,
+            error,
+          )
           delete sessions[sessionId]
-          return res.status(500).end(`建立SSE会话连接失败: ${error.message}`)
+          return res
+            .status(500)
+            .end(`Failed to establish SSE session connection: ${error.message}`)
         }
 
-        // 处理连接关闭
+        // Handle connection closure
         req.on('close', () => {
-          logger.info(`客户端断开连接（会话 ${sessionId}）`)
+          logger.info(`Client disconnected (session ${sessionId})`)
           delete sessions[sessionId]
         })
 
-        // 处理SSE错误
+        // Handle SSE error
         sseTransport.onerror = (err) => {
-          logger.error(`SSE错误（会话 ${sessionId}）:`, err)
+          logger.error(`SSE error (session ${sessionId}):`, err)
           delete sessions[sessionId]
         }
 
-        // 处理SSE关闭
+        // Handle SSE closure
         sseTransport.onclose = () => {
-          logger.info(`SSE连接关闭（会话 ${sessionId}）`)
+          logger.info(`SSE connection closed (session ${sessionId})`)
           delete sessions[sessionId]
         }
       } catch (error) {
-        logger.error(`SSE连接处理失败: ${error.message}`, error)
-        res.status(500).end(`SSE连接处理失败: ${error.message}`)
+        logger.error(
+          `SSE connection processing failed: ${error.message}`,
+          error,
+        )
+        res
+          .status(500)
+          .end(`SSE connection processing failed: ${error.message}`)
       }
     })()
   })
 
-  // 消息端点
+  // Message endpoint
   app.post(args.messagePath, (req, res) => {
     ;(async () => {
-      // 获取会话ID，优先使用查询参数，然后是请求头
+      // Get session ID, prioritize query parameters, then request headers
       const sessionId =
         typeof req.query.sessionId === 'string'
           ? req.query.sessionId
           : (req.headers['mcp-session-id'] as string) ||
             (req.headers['x-session-id'] as string)
 
-      // 打印请求信息，帮助调试
-      console.log('********** 消息请求 **********')
-      console.log('请求路径:', req.path)
-      console.log('请求查询参数:', req.query)
-      console.log('请求头:', req.headers)
-      console.log('提取的会话ID:', sessionId)
-      console.log('活动会话列表:', Object.keys(sessions))
+      // Print request information, help with debugging
+      console.log('********** Message request **********')
+      console.log('Request path:', req.path)
+      console.log('Request query parameters:', req.query)
+      console.log('Request headers:', req.headers)
+      console.log('Extracted session ID:', sessionId)
+      console.log('Active session list:', Object.keys(sessions))
       console.log('******************************')
 
       if (args.headers) {
@@ -825,7 +857,7 @@ export const apiToSse = async (args: ApiToSseArgs) => {
         })
       }
 
-      // 设置CORS头
+      // Set CORS headers
       res.setHeader('Access-Control-Allow-Origin', '*')
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
       res.setHeader(
@@ -837,80 +869,95 @@ export const apiToSse = async (args: ApiToSseArgs) => {
         'mcp-session-id, x-session-id',
       )
 
-      // 验证会话ID
+      // Validate session ID
       if (!sessionId || typeof sessionId !== 'string') {
-        logger.error('消息请求缺少会话ID参数')
-        return res.status(400).send('缺少会话ID参数')
+        logger.error('Message request missing session ID parameter')
+        return res.status(400).send('Missing session ID parameter')
       }
 
-      // 如果我们找不到会话，可能因为客户端使用了自己生成的ID而不是服务器生成的ID
-      // 尝试查看是否有任何活动会话可能是刚刚创建的
+      // If we can't find the session, it's possible because the client used its own generated ID instead of the server generated ID
+      // Try to see if there's any active session that might be newly created
       if (!sessions[sessionId] && Object.keys(sessions).length > 0) {
-        // 记录活动会话，这将帮助我们诊断问题
+        // Record active session, this will help us diagnose problems
         logger.warn(
-          `会话 ${sessionId} 不存在，但有 ${Object.keys(sessions).length} 个活动会话`,
+          `Session ${sessionId} does not exist, but there are ${Object.keys(sessions).length} active sessions`,
         )
-        logger.warn(`活动会话列表: ${Object.keys(sessions).join(', ')}`)
+        logger.warn(`Active session list: ${Object.keys(sessions).join(', ')}`)
 
-        // 如果只有一个活动会话且是最近创建的(10秒内)，尝试使用它
+        // If there's only one active session and it's recently created (within 10 seconds), try to use it
         const activeSessionIds = Object.keys(sessions)
         if (activeSessionIds.length === 1) {
           const existingSessionId = activeSessionIds[0]
           logger.warn(
-            `尝试使用当前唯一活动会话 ${existingSessionId} 代替请求的会话 ${sessionId}`,
+            `Trying to use current only active session ${existingSessionId} instead of requested session ${sessionId}`,
           )
 
-          // 向客户端返回正确的会话ID，以便它可以在后续请求中使用
+          // Pass correct session ID to client so it can use it in subsequent requests
           res.setHeader('mcp-session-id', existingSessionId)
           res.setHeader('x-session-id', existingSessionId)
 
-          // 使用找到的会话
+          // Use found session
           const session = sessions[existingSessionId]
 
-          // 处理请求
+          // Handle request
           try {
-            logger.info(`处理来自替代会话 ${existingSessionId} 的消息请求`)
+            logger.info(
+              `Handling message request from replacement session ${existingSessionId}`,
+            )
             const result = await session.transport.handlePostMessage(req, res)
-            logger.info(`成功处理来自替代会话的消息请求`)
+            logger.info(
+              `Successfully handled message request from replacement session`,
+            )
             return
           } catch (error) {
-            logger.error(`处理SSE消息失败（替代会话）: ${error.message}`, error)
-            return res.status(500).send(`处理消息失败: ${error.message}`)
+            logger.error(
+              `Failed to handle SSE message (replacement session): ${error.message}`,
+              error,
+            )
+            return res
+              .status(500)
+              .send(`Failed to handle message: ${error.message}`)
           }
         }
       }
 
-      logger.info(`处理来自会话 ${sessionId} 的消息请求`)
+      logger.info(`Handling message request from session ${sessionId}`)
 
       const session = sessions[sessionId]
 
-      // 检查会话是否存在
+      // Check if session exists
       if (!session) {
-        logger.error(`会话 ${sessionId} 不存在，可能已经过期或关闭`)
+        logger.error(
+          `Session ${sessionId} does not exist, possibly expired or closed`,
+        )
         return res
           .status(404)
-          .send(`会话 ${sessionId} 不存在，可能已经过期或关闭`)
+          .send(
+            `Session ${sessionId} does not exist, possibly expired or closed`,
+          )
       }
 
-      // 检查会话是否有可用的传输
+      // Check if session has available transport
       if (!session.transport || !session.transport.handlePostMessage) {
-        logger.error(`会话 ${sessionId} 的传输不可用`)
-        return res.status(500).send(`会话 ${sessionId} 的传输不可用`)
+        logger.error(`Session ${sessionId} transport unavailable`)
+        return res
+          .status(500)
+          .send(`Session ${sessionId} transport unavailable`)
       }
 
       try {
-        logger.info(`处理SSE消息（会话 ${sessionId}）`)
-        logger.info(`活动会话数量: ${Object.keys(sessions).length}`)
-        logger.info(`活动会话列表: ${Object.keys(sessions).join(', ')}`)
+        logger.info(`Handling SSE message (session ${sessionId})`)
+        logger.info(`Active session count: ${Object.keys(sessions).length}`)
+        logger.info(`Active session list: ${Object.keys(sessions).join(', ')}`)
 
         const originalMessage = req.body
-        logger.debug(`收到消息: ${JSON.stringify(originalMessage)}`)
+        logger.debug(`Received message: ${JSON.stringify(originalMessage)}`)
 
-        // 特殊处理 startup 请求
+        // Special handling for startup request
         if (originalMessage && originalMessage.method === 'startup') {
-          logger.info(`处理 startup 请求（会话 ${sessionId}）`)
+          logger.info(`Handling startup request (session ${sessionId})`)
 
-          // 发送成功启动响应
+          // Send successful startup response
           session.transport.send({
             jsonrpc: '2.0',
             id: originalMessage.id,
@@ -925,14 +972,14 @@ export const apiToSse = async (args: ApiToSseArgs) => {
             },
           })
 
-          // 返回成功状态
-          return res.status(200).send('启动消息已处理')
+          // Return success status
+          return res.status(200).send('Startup message processed')
         }
-        // 特殊处理 tools/list 请求
+        // Special handling for tools/list request
         else if (originalMessage && originalMessage.method === 'tools/list') {
-          logger.info(`处理 tools/list 请求（会话 ${sessionId}）`)
+          logger.info(`Handling tools/list request (session ${sessionId})`)
 
-          // 收集所有工具信息
+          // Collect all tool information
           const tools = mcpTemplate.tools.map((tool) => {
             return {
               name: tool.name,
@@ -951,11 +998,11 @@ export const apiToSse = async (args: ApiToSseArgs) => {
           })
 
           logger.info(
-            `发送工具列表（${tools.length}个工具）到会话 ${sessionId}`,
+            `Sending tool list (${tools.length} tools) to session ${sessionId}`,
           )
-          logger.debug(`工具列表详情: ${JSON.stringify(tools)}`)
+          logger.debug(`Tool list details: ${JSON.stringify(tools)}`)
 
-          // 发送工具列表响应
+          // Send tool list response
           session.transport.send({
             jsonrpc: '2.0',
             id: originalMessage.id,
@@ -964,10 +1011,10 @@ export const apiToSse = async (args: ApiToSseArgs) => {
             },
           })
 
-          // 返回成功状态
-          return res.status(200).send('工具列表请求已处理')
+          // Return success status
+          return res.status(200).send('Tool list request processed')
         }
-        // 如果是工具调用请求，处理API请求
+        // If it's a tool call request, handle API request
         else if (originalMessage && originalMessage.method === 'tools/call') {
           const result = await handleMcpRequest(
             req,
@@ -978,7 +1025,7 @@ export const apiToSse = async (args: ApiToSseArgs) => {
             logger,
           )
 
-          // 手动发送响应
+          // Manually send response
           if (originalMessage.id) {
             session.transport.send({
               jsonrpc: '2.0',
@@ -987,56 +1034,60 @@ export const apiToSse = async (args: ApiToSseArgs) => {
             })
           }
 
-          // 发送成功的响应
-          res.status(200).send('消息已处理')
+          // Send successful response
+          res.status(200).send('Message processed')
         } else {
-          // 正常处理其他类型的消息
+          // Normal processing for other types of messages
           await session.transport.handlePostMessage(req, res)
         }
       } catch (error) {
         logger.error(
-          `处理SSE消息失败（会话 ${sessionId}）: ${error.message}`,
+          `Failed to handle SSE message (session ${sessionId}): ${error.message}`,
           error,
         )
-        res.status(500).send(`处理消息失败: ${error.message}`)
+        res.status(500).send(`Failed to handle message: ${error.message}`)
       }
     })()
   })
 
-  // 启动服务器
+  // Start server
   const server = app.listen(args.port, () => {
-    logger.info(`服务器启动成功:`)
-    logger.info(`- 监听端口: ${args.port}`)
-    logger.info(`- SSE端点: http://localhost:${args.port}${args.ssePath}`)
-    logger.info(`- 消息端点: http://localhost:${args.port}${args.messagePath}`)
-    logger.info(`- 健康检查端点: http://localhost:${args.port}/health`)
-    logger.info(`- 状态检查端点: http://localhost:${args.port}/status`)
-    logger.info(`- MCP配置文件: http://localhost:${args.port}/mcp-config`)
-    logger.info(`- 支持自动检测并转换OpenAPI规范文件`)
+    logger.info(`Server started successfully:`)
+    logger.info(`- Listening port: ${args.port}`)
+    logger.info(`- SSE endpoint: http://localhost:${args.port}${args.ssePath}`)
+    logger.info(
+      `- Message endpoint: http://localhost:${args.port}${args.messagePath}`,
+    )
+    logger.info(`- Health check endpoint: http://localhost:${args.port}/health`)
+    logger.info(`- Status check endpoint: http://localhost:${args.port}/status`)
+    logger.info(`- MCP config file: http://localhost:${args.port}/mcp-config`)
+    logger.info(
+      `- Supports automatic detection and conversion of OpenAPI specification files`,
+    )
   })
 
-  // 优雅关闭
+  // Graceful shutdown
   const cleanup = () => {
-    logger.info('正在关闭服务器...')
+    logger.info('Shutting down server...')
     server.close(() => {
-      logger.info('服务器已关闭')
+      logger.info('Server closed')
       process.exit(0)
     })
 
-    // 关闭所有会话
+    // Close all sessions
     Object.keys(sessions).forEach((sid) => {
-      logger.info(`关闭会话: ${sid}`)
+      logger.info(`Closing session: ${sid}`)
       delete sessions[sid]
     })
 
-    // 5秒后强制退出
+    // Exit forcefully after 5 seconds
     setTimeout(() => {
-      logger.warn('强制退出')
+      logger.warn('Force exit')
       process.exit(1)
     }, 5000)
   }
 
-  // 处理进程信号
+  // Handle process signals
   process.on('SIGINT', cleanup)
   process.on('SIGTERM', cleanup)
 

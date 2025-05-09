@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 
-// 调试SSE会话管理测试脚本
-// 用法: node test/test-client-session.js [--port 8030] [--ssePath /sse] [--messagePath /message]
+// SSE session management debugging script
+// Usage: node test/test-client-session.js [--port 8030] [--ssePath /sse] [--messagePath /message]
 
 import * as http from 'http'
 import * as EventSource from 'eventsource'
 import { randomUUID } from 'crypto'
 
-// 解析命令行参数
+// Parse command line arguments
 const args = process.argv.slice(2)
 const PORT = args.includes('--port') ? args[args.indexOf('--port') + 1] : '8030'
 const SSE_PATH = args.includes('--ssePath')
@@ -18,32 +18,32 @@ const MESSAGE_PATH = args.includes('--messagePath')
   : '/message'
 const API_URL = `http://localhost:${PORT}`
 
-// 生成独特的会话ID用于测试
+// Generate unique session ID for testing
 const CLIENT_SESSION_ID = randomUUID()
-console.log(`\n=== SSE会话管理调试 ===`)
-console.log(`客户端生成的会话ID: ${CLIENT_SESSION_ID}`)
-console.log(`服务器地址: ${API_URL}`)
-console.log(`SSE路径: ${SSE_PATH}`)
-console.log(`消息路径: ${MESSAGE_PATH}\n`)
+console.log(`\n=== SSE Session Management Debug ===`)
+console.log(`Client-generated session ID: ${CLIENT_SESSION_ID}`)
+console.log(`Server address: ${API_URL}`)
+console.log(`SSE path: ${SSE_PATH}`)
+console.log(`Message path: ${MESSAGE_PATH}\n`)
 
-// 我们将在这里存储服务器返回的会话ID
+// We'll store the server-returned session ID here
 let SERVER_SESSION_ID = null
 
-// 测试SSE连接
-console.log(`1. 创建SSE连接并检查返回的会话ID...`)
+// Test SSE connection
+console.log(`1. Creating SSE connection and checking returned session ID...`)
 
-// 设置自定义请求头
+// Set up custom request headers
 const headers = {
   Accept: 'text/event-stream',
   'Cache-Control': 'no-cache',
   'mcp-session-id': CLIENT_SESSION_ID,
 }
 
-// 创建SSE连接，捕获实际使用的URL
+// Create SSE connection, capture the actual URL used
 let finalUrl = `${API_URL}${SSE_PATH}`
-console.log(`连接到URL: ${finalUrl}`)
+console.log(`Connecting to URL: ${finalUrl}`)
 
-// 使用自定义请求以便我们可以获取响应头
+// Use custom request so we can get response headers
 const req = http.request(
   finalUrl,
   {
@@ -51,84 +51,86 @@ const req = http.request(
     headers: headers,
   },
   (res) => {
-    console.log(`SSE连接状态: ${res.statusCode}`)
-    console.log(`SSE响应头: ${JSON.stringify(res.headers, null, 2)}`)
+    console.log(`SSE connection status: ${res.statusCode}`)
+    console.log(`SSE response headers: ${JSON.stringify(res.headers, null, 2)}`)
 
-    // 从响应头中获取服务器分配的会话ID
+    // Get server-assigned session ID from response headers
     SERVER_SESSION_ID =
       res.headers['mcp-session-id'] || res.headers['x-session-id']
 
     if (SERVER_SESSION_ID) {
-      console.log(`服务器分配的会话ID: ${SERVER_SESSION_ID}`)
+      console.log(`Server-assigned session ID: ${SERVER_SESSION_ID}`)
     } else {
       console.log(
-        `警告: 服务器未返回会话ID，将使用客户端ID: ${CLIENT_SESSION_ID}`,
+        `Warning: Server did not return session ID, will use client ID: ${CLIENT_SESSION_ID}`,
       )
       SERVER_SESSION_ID = CLIENT_SESSION_ID
     }
 
-    // 创建SSE连接
+    // Create SSE connection
     const es = new EventSource.EventSource(finalUrl, {
       headers: {
         ...headers,
-        'mcp-session-id': SERVER_SESSION_ID, // 使用服务器分配的会话ID
-        'x-session-id': SERVER_SESSION_ID, // 使用服务器分配的会话ID
+        'mcp-session-id': SERVER_SESSION_ID, // Use server-assigned session ID
+        'x-session-id': SERVER_SESSION_ID, // Use server-assigned session ID
       },
     })
 
-    // 设置事件处理器
+    // Set up event handlers
     es.onopen = () => {
-      console.log(`SSE连接已打开`)
+      console.log(`SSE connection opened`)
 
-      // 发送startup请求以初始化会话
-      console.log(`\n2. 发送startup请求...`)
+      // Send startup request to initialize session
+      console.log(`\n2. Sending startup request...`)
       sendRequest('startup', {})
     }
 
     es.onerror = (err) => {
-      console.error(`SSE连接错误:`, err)
+      console.error(`SSE connection error:`, err)
       es.close()
       process.exit(1)
     }
 
     es.onmessage = (event) => {
       try {
-        console.log(`\n收到SSE消息:`, event.data)
+        console.log(`\nReceived SSE message:`, event.data)
         const data = JSON.parse(event.data)
 
-        // 如果是startup响应，获取工具列表
+        // If it's a startup response, get the tool list
         if (data.id && data.id.includes('init')) {
-          console.log(`\n3. 发送tools/list请求...`)
+          console.log(`\n3. Sending tools/list request...`)
           sendRequest('tools/list', {})
         }
 
-        // 如果是工具列表响应，尝试调用一个工具
+        // If it's a tool list response, try to call a tool
         if (data.id && data.id.includes('list')) {
           console.log(
-            `收到工具列表，包含 ${data.result?.tools?.length || 0} 个工具`,
+            `Received tool list, containing ${data.result?.tools?.length || 0} tools`,
           )
           if (data.result?.tools?.length > 0) {
-            console.log(`\n4. 尝试工具调用 ${data.result.tools[0].name}...`)
+            console.log(
+              `\n4. Attempting tool call ${data.result.tools[0].name}...`,
+            )
             const tool = data.result.tools[0]
             const args = {}
-            // 填充必要的参数
+            // Fill necessary parameters
             if (tool.parameters) {
               Object.entries(tool.parameters).forEach(([key, param]) => {
                 if (param.required) {
-                  // 创建一个基本值，取决于参数类型
-                  if (param.type === 'string') args[key] = `测试值${key}`
+                  // Create a basic value, depending on parameter type
+                  if (param.type === 'string') args[key] = `TestValue${key}`
                   else if (param.type === 'number' || param.type === 'integer')
                     args[key] = 123
                   else if (param.type === 'boolean') args[key] = true
-                  else if (param.type === 'array') args[key] = ['测试']
-                  else if (param.type === 'object') args[key] = { key: '测试' }
-                  else args[key] = '测试默认值'
+                  else if (param.type === 'array') args[key] = ['Test']
+                  else if (param.type === 'object') args[key] = { key: 'Test' }
+                  else args[key] = 'TestDefaultValue'
                 }
               })
             }
             sendRequest('tools/call', { name: tool.name, arguments: args })
           } else {
-            console.log(`\n没有可用的工具，测试完成`)
+            console.log(`\nNo tools available, test complete`)
             setTimeout(() => {
               es.close()
               process.exit(0)
@@ -136,33 +138,35 @@ const req = http.request(
           }
         }
       } catch (error) {
-        console.error(`解析SSE消息错误:`, error)
+        console.error(`Error parsing SSE message:`, error)
       }
     }
 
-    // 处理程序退出
+    // Handle program exit
     process.on('SIGINT', () => {
-      console.log('程序中断，关闭连接')
+      console.log('Program interrupted, closing connection')
       es.close()
       process.exit(0)
     })
 
-    console.log('SSE连接已创建，等待事件...')
+    console.log('SSE connection created, waiting for events...')
   },
 )
 
 req.on('error', (error) => {
-  console.error(`连接错误: ${error.message}`)
+  console.error(`Connection error: ${error.message}`)
   process.exit(1)
 })
 
 req.end()
 
-// 通过HTTP POST发送请求到消息端点
+// Send request to message endpoint via HTTP POST
 function sendRequest(method, params) {
-  // 确保SERVER_SESSION_ID已获取
+  // Make sure SERVER_SESSION_ID has been obtained
   if (!SERVER_SESSION_ID) {
-    console.error('错误: 尚未获取服务器会话ID，无法发送请求')
+    console.error(
+      'Error: Server session ID not yet obtained, cannot send request',
+    )
     return
   }
 
@@ -177,22 +181,22 @@ function sendRequest(method, params) {
   const options = {
     hostname: 'localhost',
     port: PORT,
-    path: `${MESSAGE_PATH}?sessionId=${SERVER_SESSION_ID}`, // 使用服务器分配的会话ID
+    path: `${MESSAGE_PATH}?sessionId=${SERVER_SESSION_ID}`, // Use server-assigned session ID
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Content-Length': Buffer.byteLength(requestData),
-      'mcp-session-id': SERVER_SESSION_ID, // 使用服务器分配的会话ID
-      'x-session-id': SERVER_SESSION_ID, // 使用服务器分配的会话ID
+      'mcp-session-id': SERVER_SESSION_ID, // Use server-assigned session ID
+      'x-session-id': SERVER_SESSION_ID, // Use server-assigned session ID
     },
   }
 
-  console.log(`发送请求: ${method} (ID: ${requestId})`)
-  console.log(`请求会话ID: ${SERVER_SESSION_ID}`)
+  console.log(`Sending request: ${method} (ID: ${requestId})`)
+  console.log(`Request session ID: ${SERVER_SESSION_ID}`)
 
   const req = http.request(options, (res) => {
-    console.log(`请求状态: ${res.statusCode}`)
-    console.log(`响应头: ${JSON.stringify(res.headers)}`)
+    console.log(`Request status: ${res.statusCode}`)
+    console.log(`Response headers: ${JSON.stringify(res.headers)}`)
 
     let responseData = ''
     res.on('data', (chunk) => {
@@ -201,17 +205,17 @@ function sendRequest(method, params) {
 
     res.on('end', () => {
       if (responseData) {
-        console.log(`响应内容: ${responseData}`)
+        console.log(`Response content: ${responseData}`)
       }
     })
   })
 
   req.on('error', (error) => {
-    console.error(`请求错误: ${error.message}`)
+    console.error(`Request error: ${error.message}`)
   })
 
   req.write(requestData)
   req.end()
 }
 
-console.log('测试运行中，按Ctrl+C中断...')
+console.log('Test running, press Ctrl+C to interrupt...')
