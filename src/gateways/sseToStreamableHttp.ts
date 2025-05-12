@@ -260,14 +260,14 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
               }
 
               // Record pending request
-              session.pendingResponses.set(msg.id, msg)
+              if (session) session.pendingResponses.set(msg.id, msg)
               logger.info(
                 `Recorded pending request ${msg.id} for session ${sessionId}`,
               )
 
               // Send response back to Streamable HTTP client
               transport.send(response)
-              session.pendingResponses.delete(msg.id)
+              if (session) session.pendingResponses.delete(msg.id)
               logger.info(
                 `Response sent and request ${msg.id} cleared for session ${sessionId}`,
               )
@@ -279,13 +279,14 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
               logger.error(`Unknown message type: ${JSON.stringify(msg)}`)
             }
           } catch (err) {
-            logger.error(`Error forwarding message to SSE: ${err}`)
+            const msg = err instanceof Error ? err.message : String(err)
+            logger.error(`Error forwarding message to SSE: ${msg}`)
             const errorResponse: JSONRPCMessage = {
               jsonrpc: '2.0',
               id: (msg as any).id,
               error: {
                 code: -32603,
-                message: `Internal error: ${err}`,
+                message: `Internal error: ${msg}`,
               },
             }
             transport.send(errorResponse)
@@ -301,8 +302,11 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
         }
 
         transport.onerror = (err) => {
-          logger.error(`StreamableHTTP error (session ${sessionId}):`, err)
-          logger.error(`Error stack: ${err.stack}`)
+          const msg = err instanceof Error ? err.message : String(err)
+          logger.error(`StreamableHTTP error (session ${sessionId}):`, msg)
+          if (err instanceof Error && err.stack) {
+            logger.error(`Error stack: ${err.stack}`)
+          }
           sessions.delete(sessionId)
           logger.info(
             `Session ${sessionId} deleted due to error, remaining sessions: ${sessions.size}`,
@@ -317,12 +321,15 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
       await session.transport.handleRequest(req, res, req.body)
       logger.info(`Request handled for session ${sessionId}`)
     } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error)
       logger.error(
         `Error handling StreamableHTTP request for session ${sessionId}:`,
-        error,
+        msg,
       )
-      logger.error(`Error stack: ${(error as Error).stack}`)
-      res.status(500).send(`Internal Server Error: ${error.message}`)
+      if (error instanceof Error && error.stack) {
+        logger.error(`Error stack: ${error.stack}`)
+      }
+      res.status(500).send(`Internal Server Error: ${msg}`)
       sessions.delete(sessionId)
       logger.info(
         `Session ${sessionId} deleted due to error, remaining sessions: ${sessions.size}`,

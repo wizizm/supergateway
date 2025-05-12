@@ -1,4 +1,4 @@
-import { MCPToolDefinition } from './index'
+import { MCPToolDefinition } from './index.js'
 import axios, { AxiosInstance } from 'axios'
 
 export class APIGateway {

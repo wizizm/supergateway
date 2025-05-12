@@ -137,8 +137,10 @@ async function loadMcpTemplate(
         }
       }
     } catch (parseError) {
-      logger.error(`Failed to parse file: ${parseError.message}`, parseError)
-      throw new Error(`Failed to parse file: ${parseError.message}`)
+      const msg =
+        parseError instanceof Error ? parseError.message : String(parseError)
+      logger.error(`Failed to parse file: ${msg}`, parseError)
+      throw new Error(`Failed to parse file: ${msg}`)
     }
 
     // If it's an OpenAPI specification, convert to MCP template
@@ -168,13 +170,15 @@ async function loadMcpTemplate(
           'OpenAPI specification successfully converted to MCP template',
         )
       } catch (conversionError) {
+        const msg =
+          conversionError instanceof Error
+            ? conversionError.message
+            : String(conversionError)
         logger.error(
-          `OpenAPI specification conversion failed: ${conversionError.message}`,
+          `OpenAPI specification conversion failed: ${msg}`,
           conversionError,
         )
-        throw new Error(
-          `OpenAPI specification conversion failed: ${conversionError.message}`,
-        )
+        throw new Error(`OpenAPI specification conversion failed: ${msg}`)
       }
     }
 
@@ -197,7 +201,8 @@ async function loadMcpTemplate(
     )
     return template
   } catch (error) {
-    logger.error(`Failed to load MCP template: ${error.message}`, error)
+    const msg = error instanceof Error ? error.message : String(error)
+    logger.error(`Failed to load MCP template: ${msg}`, error)
     throw error
   }
 }
@@ -294,11 +299,11 @@ async function handleMcpRequest(
 
       // Add query parameters
       if (Object.keys(queryParams).length > 0) {
-        const queryParts = []
+        const queryParts: string[] = []
         for (const [key, value] of Object.entries(queryParams)) {
           if (value !== undefined) {
             queryParts.push(
-              `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`,
+              `${encodeURIComponent(String(key))}=${encodeURIComponent(String(value))}`,
             )
           }
         }
@@ -405,12 +410,13 @@ async function handleMcpRequest(
           ],
         }
       } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error)
         logger.error(`API call failed:`, error)
         return {
           content: [
             {
               type: 'text',
-              text: `Error: ${error.message}`,
+              text: `Error: ${msg}`,
             },
           ],
         }
@@ -514,11 +520,11 @@ async function handleMcpRequest(
 
         // Add query parameters
         if (Object.keys(queryParams).length > 0) {
-          const queryParts = []
+          const queryParts: string[] = []
           for (const [key, value] of Object.entries(queryParams)) {
             if (value !== undefined) {
               queryParts.push(
-                `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`,
+                `${encodeURIComponent(String(key))}=${encodeURIComponent(String(value))}`,
               )
             }
           }
@@ -627,12 +633,13 @@ async function handleMcpRequest(
           ],
         }
       } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error)
         logger.error(`Tool call error (${tool.name}):`, error)
         return {
           content: [
             {
               type: 'text' as const,
-              text: `Error: ${error.message}`,
+              text: `Error: ${msg}`,
             },
           ],
         }
@@ -834,7 +841,8 @@ export const apiToStreamableHttp = async (args: ApiToStreamableHttpArgs) => {
       server,
     }
   } catch (error) {
-    logger.error(`Server startup failed: ${error.message}`, error)
+    const msg = error instanceof Error ? error.message : String(error)
+    logger.error(`Server startup failed: ${msg}`, error)
     throw error
   }
 }

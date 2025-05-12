@@ -233,10 +233,10 @@ async function main() {
       if (args.outputTransport === 'sse') {
         await stdioToSse({
           stdioCmd: args.stdio!,
-          port: args.port,
-          baseUrl: args.baseUrl,
-          ssePath: args.ssePath,
-          messagePath: args.messagePath,
+          port: args.port!,
+          baseUrl: args.baseUrl || '',
+          ssePath: args.ssePath || '',
+          messagePath: args.messagePath || '',
           logger,
           corsOrigin: corsOrigin({ argv: argsWithDefaults }),
           healthEndpoints: argsWithDefaults.healthEndpoint,
@@ -248,8 +248,8 @@ async function main() {
       } else if (args.outputTransport === 'ws') {
         await stdioToWs({
           stdioCmd: args.stdio!,
-          port: args.port,
-          messagePath: args.messagePath,
+          port: args.port!,
+          messagePath: args.messagePath || '',
           logger,
           corsOrigin: corsOrigin({ argv: argsWithDefaults }),
           healthEndpoints: argsWithDefaults.healthEndpoint,
@@ -257,9 +257,9 @@ async function main() {
       } else if (args.outputTransport === 'streamable-http') {
         await stdioToStreamableHttp({
           stdioCmd: args.stdio!,
-          port: args.port,
-          baseUrl: args.baseUrl,
-          httpPath: args.httpPath,
+          port: args.port!,
+          baseUrl: args.baseUrl || '',
+          httpPath: args.httpPath || '',
           logger,
           corsOrigin: corsOrigin({ argv: argsWithDefaults }),
           healthEndpoints: argsWithDefaults.healthEndpoint,
@@ -285,8 +285,8 @@ async function main() {
       } else if (args.outputTransport === 'streamable-http') {
         await sseToStreamableHttp({
           sseUrl: args.sse!,
-          port: args.port,
-          httpPath: args.httpPath,
+          port: args.port!,
+          httpPath: args.httpPath || '',
           logger,
           corsOrigin: corsOrigin({ argv: argsWithDefaults }),
           healthEndpoints: argsWithDefaults.healthEndpoint,

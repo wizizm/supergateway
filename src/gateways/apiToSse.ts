@@ -138,8 +138,10 @@ async function loadMcpTemplate(
         }
       }
     } catch (parseError) {
-      logger.error(`Failed to parse file: ${parseError.message}`, parseError)
-      throw new Error(`Failed to parse file: ${parseError.message}`)
+      const msg =
+        parseError instanceof Error ? parseError.message : String(parseError)
+      logger.error(`Failed to parse file: ${msg}`, parseError)
+      throw new Error(`Failed to parse file: ${msg}`)
     }
 
     // If it's an OpenAPI specification, convert to MCP template
@@ -169,13 +171,15 @@ async function loadMcpTemplate(
           'OpenAPI specification successfully converted to MCP template',
         )
       } catch (conversionError) {
+        const msg =
+          conversionError instanceof Error
+            ? conversionError.message
+            : String(conversionError)
         logger.error(
-          `OpenAPI specification conversion failed: ${conversionError.message}`,
+          `OpenAPI specification conversion failed: ${msg}`,
           conversionError,
         )
-        throw new Error(
-          `OpenAPI specification conversion failed: ${conversionError.message}`,
-        )
+        throw new Error(`OpenAPI specification conversion failed: ${msg}`)
       }
     }
 
@@ -198,7 +202,8 @@ async function loadMcpTemplate(
     )
     return template
   } catch (error) {
-    logger.error(`Failed to load MCP template: ${error.message}`, error)
+    const msg = error instanceof Error ? error.message : String(error)
+    logger.error(`Failed to load MCP template: ${msg}`, error)
     throw error
   }
 }
@@ -342,7 +347,7 @@ async function handleMcpRequest(
       })
 
       if (Object.keys(bodyData).length > 0) {
-        requestBody = JSON.stringify(bodyData)
+        requestBody = JSON.stringify(bodyData) as any
         requestHeaders['Content-Type'] = 'application/json'
       }
     }
@@ -392,13 +397,11 @@ async function handleMcpRequest(
       result: formattedResponse,
     }
   } catch (error) {
-    logger.error(
-      `[${sessionId}] Request processing failed: ${error.message}`,
-      error,
-    )
+    const msg = error instanceof Error ? error.message : String(error)
+    logger.error(`[${sessionId}] Request processing failed: ${msg}`, error)
     return {
       status: 500,
-      result: { error: `Request processing failed: ${error.message}` },
+      result: { error: `Request processing failed: ${msg}` },
     }
   }
 }
@@ -499,7 +502,8 @@ export const apiToSse = async (args: ApiToSseArgs) => {
   try {
     mcpTemplate = await loadMcpTemplate(args.mcpTemplateFile, logger)
   } catch (error) {
-    logger.error(`Failed to load MCP template: ${error.message}`)
+    const msg = error instanceof Error ? error.message : String(error)
+    logger.error(`Failed to load MCP template: ${msg}`)
     throw error
   }
 
@@ -770,15 +774,17 @@ export const apiToSse = async (args: ApiToSseArgs) => {
                   ],
                 }
               } catch (error) {
+                const msg =
+                  error instanceof Error ? error.message : String(error)
                 logger.error(
-                  `Tool execution failed (${tool.name}): ${error.message}`,
+                  `Tool execution failed (${tool.name}): ${msg}`,
                   error,
                 )
                 return {
                   content: [
                     {
-                      type: 'text',
-                      text: `Execution failed: ${error.message}`,
+                      type: 'text' as const,
+                      text: `Execution failed: ${msg}`,
                     },
                   ],
                 }
@@ -792,14 +798,15 @@ export const apiToSse = async (args: ApiToSseArgs) => {
           await mcpServer.connect(sseTransport)
           logger.info(`SSE session connection established: ${sessionId}`)
         } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error)
           logger.error(
-            `Failed to establish SSE session connection: ${error.message}`,
+            `Failed to establish SSE session connection: ${msg}`,
             error,
           )
           delete sessions[sessionId]
           return res
             .status(500)
-            .end(`Failed to establish SSE session connection: ${error.message}`)
+            .end(`Failed to establish SSE session connection: ${msg}`)
         }
 
         // Handle connection closure
@@ -820,13 +827,9 @@ export const apiToSse = async (args: ApiToSseArgs) => {
           delete sessions[sessionId]
         }
       } catch (error) {
-        logger.error(
-          `SSE connection processing failed: ${error.message}`,
-          error,
-        )
-        res
-          .status(500)
-          .end(`SSE connection processing failed: ${error.message}`)
+        const msg = error instanceof Error ? error.message : String(error)
+        logger.error(`SSE connection processing failed: ${msg}`, error)
+        res.status(500).end(`SSE connection processing failed: ${msg}`)
       }
     })()
   })
@@ -910,13 +913,12 @@ export const apiToSse = async (args: ApiToSseArgs) => {
             )
             return
           } catch (error) {
+            const msg = error instanceof Error ? error.message : String(error)
             logger.error(
-              `Failed to handle SSE message (replacement session): ${error.message}`,
+              `Failed to handle SSE message (replacement session): ${msg}`,
               error,
             )
-            return res
-              .status(500)
-              .send(`Failed to handle message: ${error.message}`)
+            return res.status(500).send(`Failed to handle message: ${msg}`)
           }
         }
       }
@@ -1041,11 +1043,12 @@ export const apiToSse = async (args: ApiToSseArgs) => {
           await session.transport.handlePostMessage(req, res)
         }
       } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error)
         logger.error(
-          `Failed to handle SSE message (session ${sessionId}): ${error.message}`,
+          `Failed to handle SSE message (session ${sessionId}): ${msg}`,
           error,
         )
-        res.status(500).send(`Failed to handle message: ${error.message}`)
+        res.status(500).send(`Failed to handle message: ${msg}`)
       }
     })()
   })

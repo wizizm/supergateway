@@ -1,7 +1,7 @@
 {
   "name": "@gfsopen/supergateway",
-  "version": "3.0.2",
-  "description": "Run MCP stdio servers over SSE/StreamableHttp or visa versa",
+  "version": "3.0.7",
+  "description": "Enhanced version of supercorp-ai/supergateway, adding streamable http support and the ability to run MCP services based on both OpenAPI protocol interface documentation and higress MCP template files.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/wizizm/supergateway.git"
@@ -29,7 +29,8 @@
     "test:streamable-http": "node test/test-streamable-http.js",
     "test:sse-to-streamable-http": "node test/test-sse-to-streamable-http.js",
     "test": "node test/run-all-tests.js",
-    "openapi-to-mcp": "node dist/cmd/openapi-to-mcp.js"
+    "openapi-to-mcp": "node dist/cmd/openapi-to-mcp.js",
+    "pub": "npm run build && npm config set registry https://registry.npmjs.org/ && npm publish --access public"
   },
   "lint-staged": {
     "**/*": "prettier --write --ignore-unknown"

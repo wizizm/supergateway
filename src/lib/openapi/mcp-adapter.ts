@@ -1,6 +1,6 @@
-import { OpenAPIConverter, OpenAPIToMCPOptions } from './index'
-import { APIGateway } from './api-gateway'
-import { MCPService, MCPServiceOptions } from '../../types'
+import { OpenAPIConverter, OpenAPIToMCPOptions } from './index.js'
+import { APIGateway } from './api-gateway.js'
+import { MCPService, MCPServiceOptions } from '../../types.js'
 
 export interface OpenAPIMCPAdapterOptions extends MCPServiceOptions {
   apiSpec: OpenAPIToMCPOptions['apiSpec']

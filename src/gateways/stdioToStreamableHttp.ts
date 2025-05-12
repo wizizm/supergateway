@@ -244,7 +244,7 @@ export async function stdioToStreamableHttp(args: StdioToStreamableHttpArgs) {
 
           // 如果是请求消息，记录请求ID
           if ('method' in msg && 'id' in msg) {
-            session.pendingResponses.set(msg.id, msg)
+            if (session) session.pendingResponses.set(msg.id, msg)
             logger.info(
               `Recorded pending request ${msg.id} for session ${sessionId}`,
             )
@@ -276,12 +276,15 @@ export async function stdioToStreamableHttp(args: StdioToStreamableHttpArgs) {
       await session.transport.handleRequest(req, res, req.body)
       logger.info(`Request handled for session ${sessionId}`)
     } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error)
       logger.error(
         `Error handling StreamableHTTP request for session ${sessionId}:`,
-        error,
+        msg,
       )
-      logger.error(`Error stack: ${(error as Error).stack}`)
-      res.status(500).send(`Internal Server Error: ${error.message}`)
+      if (error instanceof Error && error.stack) {
+        logger.error(`Error stack: ${error.stack}`)
+      }
+      res.status(500).send(`Internal Server Error: ${msg}`)
       sessions.delete(sessionId)
       logger.info(
         `Session ${sessionId} deleted due to error, remaining sessions: ${sessions.size}`,
@@ -375,7 +378,7 @@ export async function stdioToStreamableHttp(args: StdioToStreamableHttpArgs) {
               code: -32099,
               message: `Child process error: ${JSON.stringify(errorObj)}`,
             },
-            id: null,
+            id: 'unknown',
           })
         } catch (err) {
           logger.error(`Failed to send error to session ${sid}:`, err)
