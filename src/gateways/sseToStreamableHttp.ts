@@ -106,11 +106,34 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
 
   // Register Streamable HTTP handler
   app.all(httpPath, async (req, res) => {
-    // Set custom response headers
-    setResponseHeaders({
-      res,
-      headers,
-    })
+    // 合并 header 时，优先用客户端 header，其次 gateway header
+    const lowerCaseHeaders = (obj: Record<string, any>) =>
+      Object.fromEntries(
+        Object.entries(obj).map(([k, v]) => [k.toLowerCase(), v]),
+      )
+
+    // 这里只合并 gateway header 和客户端 header
+    const mergedHeaders = {
+      ...lowerCaseHeaders(headers), // gateway header
+      ...lowerCaseHeaders(req.headers), // 客户端 header，优先级最高
+    }
+
+    const requestHeaders: Record<string, string | string[]> = {}
+    for (const [key, value] of Object.entries(mergedHeaders)) {
+      if (
+        ['host', 'connection', 'content-length', 'accept-encoding'].includes(
+          key,
+        )
+      )
+        continue
+      if (Array.isArray(value)) {
+        requestHeaders[key] = value.map(String)
+      } else if (value !== undefined && value !== null) {
+        requestHeaders[key] = String(value)
+      }
+    }
+    // 日志
+    logger.info(`[MCP] Final requestHeaders: ${JSON.stringify(requestHeaders)}`)
 
     // Get session ID from request headers
     const sessionId =

@@ -214,6 +214,7 @@ async function handleMcpRequest(
   logger: Logger,
 ) {
   // Create MCP server
+  logger.info(`[MCP] Incoming client headers: ${JSON.stringify(req.headers)}`)
   const server = new McpServer({
     name: 'API Gateway',
     version: getVersion(),
@@ -268,6 +269,10 @@ async function handleMcpRequest(
         }
       }
 
+      logger.info(
+        `[MCP] headerParams for tool '${tool.name}': ${JSON.stringify(headerParams)}`,
+      )
+
       // Process path parameters
       let url = tool.requestTemplate.url
       for (const [paramName, paramValue] of Object.entries(pathParams)) {
@@ -304,10 +309,31 @@ async function handleMcpRequest(
 
       logger.info(`Calling API: ${tool.requestTemplate.method} ${url}`)
 
-      // Prepare request headers
-      const requestHeaders: Record<string, string> = {
-        ...headers,
-        ...headerParams,
+      // 合并 header 时，优先用客户端 header，其次 gateway header，最后 tool header
+      const lowerCaseHeaders = (obj: Record<string, any>) =>
+        Object.fromEntries(
+          Object.entries(obj).map(([k, v]) => [k.toLowerCase(), v]),
+        )
+
+      const mergedHeaders = {
+        ...lowerCaseHeaders(headerParams), // tool header（大写，先转小写）
+        ...lowerCaseHeaders(headers), // gateway header
+        ...lowerCaseHeaders(req.headers), // 客户端 header，优先级最高
+      }
+
+      const requestHeaders: Record<string, string | string[]> = {}
+      for (const [key, value] of Object.entries(mergedHeaders)) {
+        if (
+          ['host', 'connection', 'content-length', 'accept-encoding'].includes(
+            key,
+          )
+        )
+          continue
+        if (Array.isArray(value)) {
+          requestHeaders[key] = value.map(String)
+        } else if (value !== undefined && value !== null) {
+          requestHeaders[key] = String(value)
+        }
       }
 
       // Add Content-Type header
@@ -333,9 +359,12 @@ async function handleMcpRequest(
 
       // Send API request
       try {
+        logger.info(
+          `[MCP] Final requestHeaders: ${JSON.stringify(requestHeaders)}`,
+        )
         const response = await fetch(url, {
           method: tool.requestTemplate.method,
-          headers: requestHeaders,
+          headers: requestHeaders as any,
           body,
         })
 
@@ -460,6 +489,10 @@ async function handleMcpRequest(
           }
         }
 
+        logger.info(
+          `[MCP] headerParams for tool '${tool.name}': ${JSON.stringify(headerParams)}`,
+        )
+
         // Process path parameters
         let url = tool.requestTemplate.url
         for (const [paramName, paramValue] of Object.entries(pathParams)) {
@@ -496,10 +529,34 @@ async function handleMcpRequest(
 
         logger.info(`Calling API: ${tool.requestTemplate.method} ${url}`)
 
-        // Prepare request headers
-        const requestHeaders: Record<string, string> = {
-          ...headers,
-          ...headerParams,
+        // 合并 header 时，优先用客户端 header，其次 gateway header，最后 tool header
+        const lowerCaseHeaders = (obj: Record<string, any>) =>
+          Object.fromEntries(
+            Object.entries(obj).map(([k, v]) => [k.toLowerCase(), v]),
+          )
+
+        const mergedHeaders = {
+          ...lowerCaseHeaders(headerParams), // tool header（大写，先转小写）
+          ...lowerCaseHeaders(headers), // gateway header
+          ...lowerCaseHeaders(req.headers), // 客户端 header，优先级最高
+        }
+
+        const requestHeaders: Record<string, string | string[]> = {}
+        for (const [key, value] of Object.entries(mergedHeaders)) {
+          if (
+            [
+              'host',
+              'connection',
+              'content-length',
+              'accept-encoding',
+            ].includes(key)
+          )
+            continue
+          if (Array.isArray(value)) {
+            requestHeaders[key] = value.map(String)
+          } else if (value !== undefined && value !== null) {
+            requestHeaders[key] = String(value)
+          }
         }
 
         // Add Content-Type header
@@ -524,9 +581,12 @@ async function handleMcpRequest(
             : undefined
 
         // Send API request
+        logger.info(
+          `[MCP] Final requestHeaders: ${JSON.stringify(requestHeaders)}`,
+        )
         const response = await fetch(url, {
           method: tool.requestTemplate.method,
-          headers: requestHeaders,
+          headers: requestHeaders as any,
           body,
         })
 
