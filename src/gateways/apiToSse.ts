@@ -212,39 +212,31 @@ async function loadMcpTemplate(
  * Handle MCP request
  */
 async function handleMcpRequest(
-  req: express.Request,
-  res: express.Response,
-  sessionId: string,
+  toolName: string,
+  toolArgs: any,
+  tool: McpTool,
   apiHost: string,
   headers: Record<string, string> = {},
   logger: Logger,
+  clientHeaders?: Record<string, string | string[]>,
 ) {
   try {
-    const { name, args } = req.body
+    logger.info(`===== EXECUTING API TOOL: ${toolName} =====`)
+    logger.info(`Tool arguments: ${JSON.stringify(toolArgs, null, 2)}`)
 
-    if (!name) {
+    if (!toolName) {
+      logger.error('Missing tool name in request')
       return {
-        status: 400,
-        result: { error: 'Missing tool name' },
+        error: 'Missing tool name',
       }
     }
 
-    // Get tool configuration
-    const tool = req.body.metadata?.tool
-
-    if (!tool) {
-      return {
-        status: 400,
-        result: { error: 'Missing tool configuration' },
-      }
-    }
-
-    // Build request URL
+    // Get request URL from the tool configuration
     const apiPath = tool.requestTemplate?.url || ''
     if (!apiPath) {
+      logger.error(`Tool ${toolName} has no URL in request template`)
       return {
-        status: 400,
-        result: { error: 'Missing URL in request template' },
+        error: 'Missing URL in request template',
       }
     }
 
@@ -254,9 +246,11 @@ async function handleMcpRequest(
       tool.args?.filter((arg: ToolArg) => arg.position === 'path') || []
 
     pathParams.forEach((param: ToolArg) => {
-      const paramValue = args[param.name]
+      const paramValue = toolArgs[param.name]
       if (param.required && paramValue === undefined) {
-        throw new Error(`Missing required path parameter: ${param.name}`)
+        const errorMsg = `Missing required path parameter: ${param.name}`
+        logger.error(errorMsg)
+        throw new Error(errorMsg)
       }
       if (paramValue !== undefined) {
         processedPath = processedPath.replace(
@@ -281,9 +275,11 @@ async function handleMcpRequest(
     if (queryParams.length > 0) {
       const searchParams = new URLSearchParams()
       queryParams.forEach((param: ToolArg) => {
-        const paramValue = args[param.name]
+        const paramValue = toolArgs[param.name]
         if (param.required && paramValue === undefined) {
-          throw new Error(`Missing required query parameter: ${param.name}`)
+          const errorMsg = `Missing required query parameter: ${param.name}`
+          logger.error(errorMsg)
+          throw new Error(errorMsg)
         }
         if (paramValue !== undefined) {
           searchParams.append(param.name, String(paramValue))
@@ -299,8 +295,37 @@ async function handleMcpRequest(
     // Get request method
     const method = (tool.requestTemplate?.method || 'GET').toUpperCase()
 
-    // Build request headers
-    const requestHeaders: Record<string, string> = { ...headers }
+    // 合并headers，优先处理客户端headers（类似apiToStreamableHttp中的处理方式）
+    // 转换所有键为小写，便于标准化比较
+    const lowerCaseHeaders = (obj: Record<string, any>) =>
+      Object.fromEntries(
+        Object.entries(obj).map(([k, v]) => [k.toLowerCase(), v]),
+      )
+
+    // 合并所有headers来源
+    const mergedHeaders = {
+      ...lowerCaseHeaders(headers),
+      ...(clientHeaders && lowerCaseHeaders(clientHeaders)),
+    }
+
+    // 构建最终的请求headers
+    const requestHeaders: Record<string, string | string[]> = {}
+
+    // 从合并的headers中构建请求headers，跳过一些不需要的header
+    for (const [key, value] of Object.entries(mergedHeaders)) {
+      if (
+        ['host', 'connection', 'content-length', 'accept-encoding'].includes(
+          key,
+        )
+      )
+        continue
+
+      if (Array.isArray(value)) {
+        requestHeaders[key] = value.map(String)
+      } else if (value !== undefined && value !== null) {
+        requestHeaders[key] = String(value)
+      }
+    }
 
     // Add headers defined in the tool template
     if (
@@ -320,10 +345,17 @@ async function handleMcpRequest(
     // Add header parameters
     const headerParams =
       tool.args?.filter((arg: ToolArg) => arg.position === 'header') || []
+
+    logger.info(
+      `[MCP] headerParams for tool '${toolName}': ${JSON.stringify(headerParams.map((p) => p.name))}`,
+    )
+
     headerParams.forEach((param: ToolArg) => {
-      const paramValue = args[param.name]
+      const paramValue = toolArgs[param.name]
       if (param.required && paramValue === undefined) {
-        throw new Error(`Missing required header parameter: ${param.name}`)
+        const errorMsg = `Missing required header parameter: ${param.name}`
+        logger.error(errorMsg)
+        throw new Error(errorMsg)
       }
       if (paramValue !== undefined) {
         requestHeaders[param.name] = String(paramValue)
@@ -337,9 +369,11 @@ async function handleMcpRequest(
     if (bodyParams.length > 0) {
       const bodyData: Record<string, any> = {}
       bodyParams.forEach((param: ToolArg) => {
-        const paramValue = args[param.name]
+        const paramValue = toolArgs[param.name]
         if (param.required && paramValue === undefined) {
-          throw new Error(`Missing required body parameter: ${param.name}`)
+          const errorMsg = `Missing required body parameter: ${param.name}`
+          logger.error(errorMsg)
+          throw new Error(errorMsg)
         }
         if (paramValue !== undefined) {
           bodyData[param.name] = paramValue
@@ -353,17 +387,16 @@ async function handleMcpRequest(
     }
 
     // Send request to API server
-    logger.info(`[${sessionId}] Sending request: ${method} ${url}`)
-    logger.info(
-      `[${sessionId}] Request headers: ${JSON.stringify(requestHeaders)}`,
-    )
+    logger.info(`Calling API: ${method} ${url}`)
+    logger.info(`[MCP] Final requestHeaders: ${JSON.stringify(requestHeaders)}`)
+
     if (requestBody) {
-      logger.info(`[${sessionId}] Request body: ${requestBody}`)
+      logger.debug(`Request body: ${requestBody}`)
     }
 
     const response = await fetch(url, {
       method,
-      headers: requestHeaders,
+      headers: requestHeaders as any,
       body: requestBody,
     })
 
@@ -371,20 +404,90 @@ async function handleMcpRequest(
     const contentType = response.headers.get('content-type') || ''
     let responseData: any
 
-    if (contentType.includes('application/json')) {
-      responseData = await response.json()
-    } else {
-      responseData = await response.text()
+    // 检查HTTP状态码
+    if (!response.ok) {
+      const statusText = response.statusText || `HTTP ${response.status}`
+      let errorMessage = `API请求失败: ${statusText}`
+
+      try {
+        // 尝试获取错误详情
+        if (contentType.includes('application/json')) {
+          const errorJson = (await response.json()) as Record<string, any>
+          logger.error(`API错误响应: ${JSON.stringify(errorJson)}`)
+          errorMessage = errorJson.message || errorJson.error || errorMessage
+        } else {
+          const errorText = await response.text()
+          if (errorText) {
+            logger.error(`API错误响应: ${errorText}`)
+            errorMessage = `${errorMessage} - ${errorText}`
+          }
+        }
+      } catch (parseError) {
+        logger.error(
+          `解析错误响应失败: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+        )
+      }
+
+      logger.error(`${method} ${url} 失败: ${response.status} ${statusText}`)
+      return { error: errorMessage, status: response.status }
     }
 
-    logger.info(`[${sessionId}] Response status: ${response.status}`)
-    logger.info(`[${sessionId}] Response content type: ${contentType}`)
-    logger.info(
-      `[${sessionId}] Response data: ${JSON.stringify(responseData).substring(0, 1000)}${JSON.stringify(responseData).length > 1000 ? '...' : ''}`,
-    )
+    if (contentType.includes('application/json')) {
+      try {
+        responseData = await response.json()
+        logger.info(
+          `API response status: ${response.status}, content type: application/json`,
+        )
+
+        // 检查是否有内容（即使状态码是200）
+        if (
+          responseData === null ||
+          responseData === undefined ||
+          (typeof responseData === 'object' &&
+            Object.keys(responseData).length === 0)
+        ) {
+          logger.warn(
+            `API返回了状态码 ${response.status}，但响应体为空或为空对象`,
+          )
+        } else {
+          // 记录一些响应数据的摘要，太长的话就截断
+          const responseStr = JSON.stringify(responseData)
+          const truncated =
+            responseStr.length > 500
+              ? responseStr.substring(0, 500) + '...'
+              : responseStr
+          logger.info(`API响应数据: ${truncated}`)
+        }
+      } catch (jsonError) {
+        logger.error(
+          `解析JSON响应失败: ${jsonError instanceof Error ? jsonError.message : String(jsonError)}`,
+        )
+        return {
+          error: `解析JSON响应失败: ${jsonError instanceof Error ? jsonError.message : String(jsonError)}`,
+          status: response.status,
+        }
+      }
+    } else {
+      responseData = await response.text()
+      logger.info(
+        `API response status: ${response.status}, content type: ${contentType}`,
+      )
+
+      if (responseData) {
+        const truncated =
+          responseData.length > 500
+            ? responseData.substring(0, 500) + '...'
+            : responseData
+        logger.info(`API响应数据: ${truncated}`)
+      } else {
+        logger.warn(`API返回了状态码 ${response.status}，但响应体为空`)
+      }
+    }
 
     // Process response template (if any)
     let formattedResponse = responseData
+
+    // 添加响应模板前缀（如果有）
     if (
       tool.responseTemplate?.prependBody &&
       typeof responseData === 'string'
@@ -392,17 +495,17 @@ async function handleMcpRequest(
       formattedResponse = tool.responseTemplate.prependBody + responseData
     }
 
-    return {
-      status: response.status,
-      result: formattedResponse,
-    }
+    logger.info(`===== FINISHED API TOOL: ${toolName} =====`)
+    return formattedResponse
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)
-    logger.error(`[${sessionId}] Request processing failed: ${msg}`, error)
-    return {
-      status: 500,
-      result: { error: `Request processing failed: ${msg}` },
+    logger.error(`===== API TOOL ERROR: ${toolName} =====`)
+    logger.error(`Error message: ${msg}`)
+    if (error instanceof Error && error.stack) {
+      logger.error(`Stack trace: ${error.stack}`)
     }
+    logger.error(`===== END API TOOL ERROR =====`)
+    return { error: `Request processing failed: ${msg}` }
   }
 }
 
@@ -423,6 +526,14 @@ export const apiToSse = async (args: ApiToSseArgs) => {
   const { logger } = args
   const app = express()
 
+  // 保存活跃会话的传输和请求头信息
+  const transports: Record<string, SSEServerTransport> = {}
+  // 保存每个会话的客户端请求头
+  const sessionHeaders: Record<string, Record<string, string | string[]>> = {}
+
+  // 存储全局变量，跟踪当前正在处理的会话ID
+  let currentSessionId = ''
+
   logger.info(`Initializing API->SSE gateway configuration:`)
   logger.info(`- API host: ${args.apiHost}`)
   logger.info(
@@ -436,42 +547,31 @@ export const apiToSse = async (args: ApiToSseArgs) => {
   app.use(
     cors({
       origin: args.corsOrigin ? formatCorsOrigin(args.corsOrigin) : '*',
-      methods: 'GET,POST',
-      allowedHeaders: 'Content-Type,Authorization',
+      methods: 'GET,POST,OPTIONS',
+      allowedHeaders: 'Content-Type,Authorization,mcp-session-id,x-session-id',
+      exposedHeaders: 'mcp-session-id,x-session-id',
+      credentials: true,
+      maxAge: 86400,
     }),
   )
 
-  // Parse JSON request body
+  // Apply bodyParser middleware for non-message requests
   app.use((req, res, next) => {
-    if (req.path === args.messagePath) return next()
-    return bodyParser.json()(req, res, next)
-  })
+    if (req.path !== args.messagePath) {
+      bodyParser.json()(req, res, next)
+    } else {
+      // Save raw request body for message path requests
+      let data = ''
+      req.on('data', (chunk) => {
+        data += chunk
+      })
 
-  // Add CORS preflight request handler
-  app.options('*', (req, res) => {
-    // Set CORS response headers
-    res.setHeader('Access-Control-Allow-Origin', '*')
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-    res.setHeader(
-      'Access-Control-Allow-Headers',
-      'Content-Type, Authorization, mcp-session-id, x-session-id, Accept, Origin, X-Requested-With',
-    )
-    res.setHeader('Access-Control-Max-Age', '86400') // 24 hours
-    res.setHeader(
-      'Access-Control-Expose-Headers',
-      'mcp-session-id, x-session-id',
-    )
-
-    // If there are custom headers, add them as well
-    if (args.headers) {
-      setResponseHeaders({
-        res,
-        headers: args.headers,
+      req.on('end', () => {
+        // Store raw body for later use
+        ;(req as any).rawBody = data
+        next()
       })
     }
-
-    // Return success status
-    res.status(204).end()
   })
 
   // Add health check routes
@@ -512,587 +612,1043 @@ export const apiToSse = async (args: ApiToSseArgs) => {
     res.json(mcpTemplate)
   })
 
-  // Store active SSE sessions
-  const sessions: Record<
-    string,
-    { transport: SSEServerTransport; server: McpServer }
-  > = {}
-
-  // SSE endpoint
-  app.get(args.ssePath, (req, res) => {
-    ;(async () => {
-      logger.info(`New SSE connection: ${req.ip}`)
-
-      if (args.headers) {
-        setResponseHeaders({
-          res,
-          headers: args.headers,
-        })
-      }
-
-      try {
-        // Get session ID from request or generate new ID
-        const sessionId =
-          (req.headers['mcp-session-id'] as string) ||
-          (req.headers['x-session-id'] as string) ||
-          randomUUID()
-
-        logger.info(`Using session ID: ${sessionId}`)
-
-        // Configure CORS headers
-        res.setHeader('Access-Control-Allow-Origin', '*')
-        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        res.setHeader(
-          'Access-Control-Allow-Headers',
-          'Content-Type, Authorization, mcp-session-id, x-session-id',
-        )
-        res.setHeader(
-          'Access-Control-Expose-Headers',
-          'mcp-session-id, x-session-id',
-        )
-
-        // Pass session ID to client
-        res.setHeader('mcp-session-id', sessionId)
-        res.setHeader('x-session-id', sessionId)
-
-        // Create SSE transport, explicitly including session ID in URL to ensure transport layer uses correct ID
-        const messagePath = `${args.messagePath}?sessionId=${sessionId}`
-        logger.info(`SSE message path: ${messagePath}`)
-
-        const sseTransport = new SSEServerTransport(
-          `${req.protocol}://${req.headers.host}${messagePath}`,
-          res,
-        )
-
-        // Create MCP server, one instance per connection
-        const mcpServer = new McpServer({
-          name: mcpTemplate.server.name,
-          version: mcpTemplate.server.version || getVersion(),
-        })
-
-        // Save session
-        sessions[sessionId] = {
-          transport: sseTransport,
-          server: mcpServer,
-        }
-
-        logger.info(`New session created: ${sessionId}`)
-        logger.info(`Active session count: ${Object.keys(sessions).length}`)
-        logger.info(`Active session list: ${Object.keys(sessions).join(', ')}`)
-
-        // Print tool information
-        logger.info(`Registering ${mcpTemplate.tools.length} tools:`)
-
-        // Register tool processing function for each tool
-        for (const tool of mcpTemplate.tools) {
-          logger.info(
-            `Registering tool: ${tool.name} (${tool.args.length} parameters)`,
-          )
-
-          // Print parameter information
-          tool.args.forEach((arg) => {
-            logger.info(
-              `   Parameter: ${arg.name} (${arg.type}) [${arg.position}] ${arg.required ? 'Required' : 'Optional'}`,
-            )
-          })
-
-          // Register tool
-          mcpServer.tool(
-            tool.name,
-            tool.description,
-            // Build parameter validation object
-            (() => {
-              // Create parameter validation object
-              const paramSchema: Record<string, z.ZodType<any>> = {}
-
-              // Process tool parameters
-              if (tool.args && Array.isArray(tool.args)) {
-                for (const arg of tool.args) {
-                  // Choose correct zod validator based on parameter type
-                  const paramType = (arg.type || 'string').toLowerCase()
-
-                  try {
-                    switch (paramType) {
-                      case 'string':
-                        paramSchema[arg.name] = arg.required
-                          ? z.string()
-                          : z.string().optional()
-                        break
-                      case 'number':
-                      case 'integer':
-                        paramSchema[arg.name] = arg.required
-                          ? z
-                              .string()
-                              .transform((val) => Number(val))
-                              .pipe(z.number())
-                          : z
-                              .string()
-                              .transform((val) =>
-                                val ? Number(val) : undefined,
-                              )
-                              .pipe(z.number().optional())
-                        break
-                      case 'boolean':
-                        paramSchema[arg.name] = arg.required
-                          ? z
-                              .string()
-                              .transform((val) => val === 'true' || val === '1')
-                          : z
-                              .string()
-                              .optional()
-                              .transform((val) => val === 'true' || val === '1')
-                        break
-                      case 'array':
-                        paramSchema[arg.name] = arg.required
-                          ? z
-                              .string()
-                              .transform((val) => {
-                                try {
-                                  return JSON.parse(val)
-                                } catch (e) {
-                                  return val ? val.split(',') : []
-                                }
-                              })
-                              .pipe(z.array(z.any()))
-                          : z
-                              .string()
-                              .optional()
-                              .transform((val) => {
-                                if (!val) return undefined
-                                try {
-                                  return JSON.parse(val)
-                                } catch (e) {
-                                  return val.split(',')
-                                }
-                              })
-                              .pipe(z.array(z.any()).optional())
-                        break
-                      case 'object':
-                        paramSchema[arg.name] = arg.required
-                          ? z
-                              .string()
-                              .transform((val) => {
-                                try {
-                                  return JSON.parse(val)
-                                } catch (e) {
-                                  return {}
-                                }
-                              })
-                              .pipe(z.record(z.any()))
-                          : z
-                              .string()
-                              .optional()
-                              .transform((val) => {
-                                if (!val) return undefined
-                                try {
-                                  return JSON.parse(val)
-                                } catch (e) {
-                                  return {}
-                                }
-                              })
-                              .pipe(z.record(z.any()).optional())
-                        break
-                      default:
-                        // Default to string processing
-                        paramSchema[arg.name] = arg.required
-                          ? z.string()
-                          : z.string().optional()
-                    }
-                  } catch (error) {
-                    logger.error(
-                      `Failed to create parameter validator: ${arg.name}`,
-                      error,
-                    )
-                    // If error, use string as fallback
-                    paramSchema[arg.name] = arg.required
-                      ? z.string()
-                      : z.string().optional()
-                  }
-                }
-              }
-
-              return paramSchema
-            })(),
-            async (toolParams) => {
-              try {
-                // Record tool parameter information
-                logger.info(`Executing tool: ${tool.name}`)
-                logger.info(`Passed parameters: ${JSON.stringify(toolParams)}`)
-
-                // Build parameters to use for API request
-                const requestParams = {
-                  name: tool.name,
-                  args: toolParams,
-                  metadata: {
-                    tool: tool,
-                  },
-                }
-
-                // Construct a request object
-                const customReq = {
-                  body: requestParams,
-                  headers: req.headers,
-                  protocol: req.protocol,
-                  ip: req.ip,
-                }
-
-                // Handle API request
-                const result = await handleMcpRequest(
-                  customReq as any,
-                  res,
-                  String(sessionId),
-                  args.apiHost,
-                  args.headers || {},
-                  logger,
-                )
-
-                // Format response
-                let responseText = ''
-
-                if (typeof result.result === 'string') {
-                  responseText = result.result
-                } else {
-                  try {
-                    responseText = JSON.stringify(result.result, null, 2)
-                  } catch (error) {
-                    responseText = `Unable to serialize result: ${String(result.result)}`
-                  }
-                }
-
-                // Record response information
-                logger.info(
-                  `Tool execution result: ${responseText.length > 200 ? responseText.substring(0, 200) + '...' : responseText}`,
-                )
-
-                // Return standard format response
-                return {
-                  content: [
-                    {
-                      type: 'text',
-                      text: responseText,
-                    },
-                  ],
-                }
-              } catch (error) {
-                const msg =
-                  error instanceof Error ? error.message : String(error)
-                logger.error(
-                  `Tool execution failed (${tool.name}): ${msg}`,
-                  error,
-                )
-                return {
-                  content: [
-                    {
-                      type: 'text' as const,
-                      text: `Execution failed: ${msg}`,
-                    },
-                  ],
-                }
-              }
-            },
-          )
-        }
-
-        // Connect transport
-        try {
-          await mcpServer.connect(sseTransport)
-          logger.info(`SSE session connection established: ${sessionId}`)
-        } catch (error) {
-          const msg = error instanceof Error ? error.message : String(error)
-          logger.error(
-            `Failed to establish SSE session connection: ${msg}`,
-            error,
-          )
-          delete sessions[sessionId]
-          return res
-            .status(500)
-            .end(`Failed to establish SSE session connection: ${msg}`)
-        }
-
-        // Handle connection closure
-        req.on('close', () => {
-          logger.info(`Client disconnected (session ${sessionId})`)
-          delete sessions[sessionId]
-        })
-
-        // Handle SSE error
-        sseTransport.onerror = (err) => {
-          logger.error(`SSE error (session ${sessionId}):`, err)
-          delete sessions[sessionId]
-        }
-
-        // Handle SSE closure
-        sseTransport.onclose = () => {
-          logger.info(`SSE connection closed (session ${sessionId})`)
-          delete sessions[sessionId]
-        }
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error)
-        logger.error(`SSE connection processing failed: ${msg}`, error)
-        res.status(500).end(`SSE connection processing failed: ${msg}`)
-      }
-    })()
+  // Create MCP server
+  const mcpServer = new McpServer({
+    name: mcpTemplate.server.name,
+    version: mcpTemplate.server.version || getVersion(),
   })
 
-  // Message endpoint
-  app.post(args.messagePath, (req, res) => {
-    ;(async () => {
-      // Get session ID, prioritize query parameters, then request headers
-      const sessionId =
-        typeof req.query.sessionId === 'string'
-          ? req.query.sessionId
-          : (req.headers['mcp-session-id'] as string) ||
-            (req.headers['x-session-id'] as string)
+  // Add a debug tool that just logs the request
+  mcpServer.tool(
+    'debug',
+    'Log the tool call for debugging',
+    {
+      message: z.string().optional().describe('Optional message to log'),
+      data: z.any().optional().describe('Optional data to log'),
+      testMode: z
+        .boolean()
+        .optional()
+        .describe('If true, will return the input as output'),
+    },
+    async (params) => {
+      const msg = params.message || 'Debug tool called'
+      logger.info(`===== DEBUG TOOL CALL =====`)
+      logger.info(`Message: ${msg}`)
 
-      // Print request information, help with debugging
-      console.log('********** Message request **********')
-      console.log('Request path:', req.path)
-      console.log('Request query parameters:', req.query)
-      console.log('Request headers:', req.headers)
-      console.log('Extracted session ID:', sessionId)
-      console.log('Active session list:', Object.keys(sessions))
-      console.log('******************************')
-
-      if (args.headers) {
-        setResponseHeaders({
-          res,
-          headers: args.headers,
-        })
-      }
-
-      // Set CORS headers
-      res.setHeader('Access-Control-Allow-Origin', '*')
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-      res.setHeader(
-        'Access-Control-Allow-Headers',
-        'Content-Type, Authorization, mcp-session-id, x-session-id',
-      )
-      res.setHeader(
-        'Access-Control-Expose-Headers',
-        'mcp-session-id, x-session-id',
-      )
-
-      // Validate session ID
-      if (!sessionId || typeof sessionId !== 'string') {
-        logger.error('Message request missing session ID parameter')
-        return res.status(400).send('Missing session ID parameter')
-      }
-
-      // If we can't find the session, it's possible because the client used its own generated ID instead of the server generated ID
-      // Try to see if there's any active session that might be newly created
-      if (!sessions[sessionId] && Object.keys(sessions).length > 0) {
-        // Record active session, this will help us diagnose problems
-        logger.warn(
-          `Session ${sessionId} does not exist, but there are ${Object.keys(sessions).length} active sessions`,
-        )
-        logger.warn(`Active session list: ${Object.keys(sessions).join(', ')}`)
-
-        // If there's only one active session and it's recently created (within 10 seconds), try to use it
-        const activeSessionIds = Object.keys(sessions)
-        if (activeSessionIds.length === 1) {
-          const existingSessionId = activeSessionIds[0]
-          logger.warn(
-            `Trying to use current only active session ${existingSessionId} instead of requested session ${sessionId}`,
-          )
-
-          // Pass correct session ID to client so it can use it in subsequent requests
-          res.setHeader('mcp-session-id', existingSessionId)
-          res.setHeader('x-session-id', existingSessionId)
-
-          // Use found session
-          const session = sessions[existingSessionId]
-
-          // Handle request
-          try {
-            logger.info(
-              `Handling message request from replacement session ${existingSessionId}`,
-            )
-            const result = await session.transport.handlePostMessage(req, res)
-            logger.info(
-              `Successfully handled message request from replacement session`,
-            )
-            return
-          } catch (error) {
-            const msg = error instanceof Error ? error.message : String(error)
-            logger.error(
-              `Failed to handle SSE message (replacement session): ${msg}`,
-              error,
-            )
-            return res.status(500).send(`Failed to handle message: ${msg}`)
-          }
-        }
-      }
-
-      logger.info(`Handling message request from session ${sessionId}`)
-
-      const session = sessions[sessionId]
-
-      // Check if session exists
-      if (!session) {
-        logger.error(
-          `Session ${sessionId} does not exist, possibly expired or closed`,
-        )
-        return res
-          .status(404)
-          .send(
-            `Session ${sessionId} does not exist, possibly expired or closed`,
-          )
-      }
-
-      // Check if session has available transport
-      if (!session.transport || !session.transport.handlePostMessage) {
-        logger.error(`Session ${sessionId} transport unavailable`)
-        return res
-          .status(500)
-          .send(`Session ${sessionId} transport unavailable`)
-      }
-
-      try {
-        logger.info(`Handling SSE message (session ${sessionId})`)
-        logger.info(`Active session count: ${Object.keys(sessions).length}`)
-        logger.info(`Active session list: ${Object.keys(sessions).join(', ')}`)
-
-        const originalMessage = req.body
-        logger.debug(`Received message: ${JSON.stringify(originalMessage)}`)
-
-        // Special handling for startup request
-        if (originalMessage && originalMessage.method === 'startup') {
-          logger.info(`Handling startup request (session ${sessionId})`)
-
-          // Send successful startup response
-          session.transport.send({
-            jsonrpc: '2.0',
-            id: originalMessage.id,
-            result: {
-              name: mcpTemplate.server.name,
-              version: mcpTemplate.server.version || getVersion(),
-              capabilities: {
-                tools: {
-                  listChanged: true,
-                },
-              },
-            },
-          })
-
-          // Return success status
-          return res.status(200).send('Startup message processed')
-        }
-        // Special handling for tools/list request
-        else if (originalMessage && originalMessage.method === 'tools/list') {
-          logger.info(`Handling tools/list request (session ${sessionId})`)
-
-          // Collect all tool information
-          const tools = mcpTemplate.tools.map((tool) => {
-            return {
-              name: tool.name,
-              description: tool.description,
-              parameters: Object.fromEntries(
-                tool.args.map((arg) => [
-                  arg.name,
-                  {
-                    type: arg.type || 'string',
-                    description: arg.description || '',
-                    required: arg.required,
-                  },
-                ]),
-              ),
-            }
-          })
-
+      if (params.data !== undefined) {
+        try {
+          const dataStr =
+            typeof params.data === 'object'
+              ? JSON.stringify(params.data, null, 2)
+              : String(params.data)
+          logger.info(`Data: ${dataStr}`)
+        } catch (e) {
           logger.info(
-            `Sending tool list (${tools.length} tools) to session ${sessionId}`,
+            `Data: [Error serializing data: ${e instanceof Error ? e.message : String(e)}]`,
           )
-          logger.debug(`Tool list details: ${JSON.stringify(tools)}`)
-
-          // Send tool list response
-          session.transport.send({
-            jsonrpc: '2.0',
-            id: originalMessage.id,
-            result: {
-              tools: tools,
-            },
-          })
-
-          // Return success status
-          return res.status(200).send('Tool list request processed')
         }
-        // If it's a tool call request, handle API request
-        else if (originalMessage && originalMessage.method === 'tools/call') {
+      }
+
+      logger.info(`===== END DEBUG TOOL CALL =====`)
+
+      // For testing, we can echo back the input
+      const responseData = params.testMode
+        ? {
+            message: msg,
+            data: params.data,
+            timestamp: new Date().toISOString(),
+          }
+        : { content: msg, timestamp: new Date().toISOString() }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(responseData, null, 2),
+          },
+        ],
+      }
+    },
+  )
+
+  // Register tools from template
+  logger.info(`Registering ${mcpTemplate.tools.length} tools:`)
+  for (const tool of mcpTemplate.tools) {
+    logger.info(
+      `Registering tool: ${tool.name} (${tool.args.length} parameters)`,
+    )
+
+    // Build parameter schema
+    const paramSchema: Record<string, z.ZodType<any>> = {}
+
+    if (tool.args && Array.isArray(tool.args)) {
+      for (const arg of tool.args) {
+        const paramType = (arg.type || 'string').toLowerCase()
+
+        try {
+          switch (paramType) {
+            case 'string':
+              paramSchema[arg.name] = arg.required
+                ? z.string()
+                : z.string().optional()
+              break
+            case 'number':
+            case 'integer':
+              paramSchema[arg.name] = arg.required
+                ? z
+                    .string()
+                    .transform((val) => Number(val))
+                    .pipe(z.number())
+                : z
+                    .string()
+                    .transform((val) => (val ? Number(val) : undefined))
+                    .pipe(z.number().optional())
+              break
+            case 'boolean':
+              paramSchema[arg.name] = arg.required
+                ? z.string().transform((val) => val === 'true' || val === '1')
+                : z
+                    .string()
+                    .optional()
+                    .transform((val) => val === 'true' || val === '1')
+              break
+            case 'array':
+              paramSchema[arg.name] = arg.required
+                ? z
+                    .string()
+                    .transform((val) => {
+                      try {
+                        return JSON.parse(val)
+                      } catch (e) {
+                        return val ? val.split(',') : []
+                      }
+                    })
+                    .pipe(z.array(z.any()))
+                : z
+                    .string()
+                    .optional()
+                    .transform((val) => {
+                      if (!val) return undefined
+                      try {
+                        return JSON.parse(val)
+                      } catch (e) {
+                        return val.split(',')
+                      }
+                    })
+                    .pipe(z.array(z.any()).optional())
+              break
+            case 'object':
+              paramSchema[arg.name] = arg.required
+                ? z
+                    .string()
+                    .transform((val) => {
+                      try {
+                        return JSON.parse(val)
+                      } catch (e) {
+                        return {}
+                      }
+                    })
+                    .pipe(z.record(z.any()))
+                : z
+                    .string()
+                    .optional()
+                    .transform((val) => {
+                      if (!val) return undefined
+                      try {
+                        return JSON.parse(val)
+                      } catch (e) {
+                        return {}
+                      }
+                    })
+                    .pipe(z.record(z.any()).optional())
+              break
+            default:
+              paramSchema[arg.name] = arg.required
+                ? z.string()
+                : z.string().optional()
+          }
+        } catch (error) {
+          logger.error(
+            `Failed to create parameter validator: ${arg.name}`,
+            error,
+          )
+          // Fallback to string
+          paramSchema[arg.name] = arg.required
+            ? z.string()
+            : z.string().optional()
+        }
+      }
+    }
+
+    // Dump the full parameter schema for debugging
+    logger.info(
+      `Tool ${tool.name} parameter schema: ${JSON.stringify(Object.keys(paramSchema))}`,
+    )
+
+    // Register tool
+    mcpServer.tool(
+      tool.name,
+      tool.description,
+      paramSchema,
+      async (toolParams, context) => {
+        try {
+          logger.info(`========== EXECUTING TOOL: ${tool.name} ==========`)
+          logger.info(`Tool parameters: ${JSON.stringify(toolParams)}`)
+
+          // 获取当前会话ID和相关头信息
+          const sessionId = currentSessionId
+          const clientHeaders = sessionId
+            ? sessionHeaders[sessionId]
+            : undefined
+
+          if (clientHeaders) {
+            logger.info(
+              `Client headers found for session ${sessionId}: ${JSON.stringify(Object.keys(clientHeaders))}`,
+            )
+          } else {
+            logger.info(`No client headers available for this request`)
+          }
+
           const result = await handleMcpRequest(
-            req,
-            res,
-            sessionId,
+            tool.name,
+            toolParams,
+            tool,
             args.apiHost,
             args.headers || {},
             logger,
+            clientHeaders,
           )
 
-          // Manually send response
-          if (originalMessage.id) {
-            session.transport.send({
-              jsonrpc: '2.0',
-              id: originalMessage.id,
-              result: result.result,
-            })
+          // Format response
+          let responseText = ''
+
+          if (typeof result === 'string') {
+            responseText = result
+          } else if (result && result.error) {
+            // 如果API调用返回了错误，记录详细日志并返回格式化的错误消息
+            logger.error(`API调用错误 (${tool.name}): ${result.error}`)
+            responseText = JSON.stringify(
+              {
+                error: result.error,
+                toolName: tool.name,
+                timestamp: new Date().toISOString(),
+              },
+              null,
+              2,
+            )
+          } else if (
+            result === null ||
+            result === undefined ||
+            (typeof result === 'object' && Object.keys(result).length === 0)
+          ) {
+            // 处理空结果或空对象情况
+            logger.warn(`工具 ${tool.name} 返回了空结果或空对象`)
+            responseText = JSON.stringify(
+              {
+                message: 'API调用成功但返回了空结果',
+                toolName: tool.name,
+                timestamp: new Date().toISOString(),
+              },
+              null,
+              2,
+            )
+          } else {
+            try {
+              responseText = JSON.stringify(result, null, 2)
+            } catch (error) {
+              responseText = `Unable to serialize result: ${String(result)}`
+            }
           }
 
-          // Send successful response
-          res.status(200).send('Message processed')
+          logger.info(
+            `Tool execution result for ${tool.name}: ${responseText.length > 200 ? responseText.substring(0, 200) + '...' : responseText}`,
+          )
+          logger.info(`========== FINISHED TOOL: ${tool.name} ==========`)
+
+          // 确保空结果也能返回有意义的内容
+          const isEmptyResult =
+            responseText === '{}' ||
+            responseText === '[]' ||
+            responseText === 'null' ||
+            responseText === ''
+
+          if (isEmptyResult) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(
+                    {
+                      message: 'API调用成功，但返回空结果或空对象',
+                      toolName: tool.name,
+                      timestamp: new Date().toISOString(),
+                    },
+                    null,
+                    2,
+                  ),
+                },
+              ],
+            }
+          }
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: responseText,
+              },
+            ],
+          }
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error)
+          logger.error(`Tool execution failed (${tool.name}): ${msg}`, error)
+          logger.error(`========== FAILED TOOL: ${tool.name} ==========`)
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: `Execution failed: ${msg}`,
+              },
+            ],
+          }
+        }
+      },
+    )
+  }
+
+  // SSE endpoint
+  app.get(args.ssePath, async (req: express.Request, res: express.Response) => {
+    logger.info(`New SSE connection from: ${req.ip}`)
+
+    if (args.headers) {
+      setResponseHeaders({
+        res,
+        headers: args.headers,
+      })
+    }
+
+    // Track response status to prevent multiple responses
+    let responseHandled = false
+
+    try {
+      // Create new transport
+      const sseTransport = new SSEServerTransport(`${args.messagePath}`, res)
+
+      // Log registered tools by showing the template
+      logger.info(
+        `Server has ${mcpTemplate.tools.length} registered tools: ${mcpTemplate.tools.map((t) => t.name).join(', ')}`,
+      )
+
+      // Set session headers BEFORE connecting to avoid "headers already sent" error
+      // The session ID will be available immediately after transport creation
+      const sessionId = sseTransport.sessionId
+      if (sessionId) {
+        if (!res.headersSent) {
+          // Send session info in headers
+          res.setHeader('mcp-session-id', sessionId)
+          res.setHeader('x-session-id', sessionId)
+          // Ensure clients can read these headers
+          res.setHeader(
+            'Access-Control-Expose-Headers',
+            'mcp-session-id,x-session-id',
+          )
+          logger.debug(`Set session headers for ${sessionId}`)
         } else {
-          // Normal processing for other types of messages
-          await session.transport.handlePostMessage(req, res)
+          logger.warn(
+            `Headers already sent, cannot set session ID headers for ${sessionId}`,
+          )
+        }
+
+        // 保存客户端请求头信息
+        const cleanHeaders: Record<string, string | string[]> = {}
+        // 过滤掉undefined值
+        for (const [key, value] of Object.entries(req.headers)) {
+          if (value !== undefined) {
+            cleanHeaders[key] = value
+          }
+        }
+
+        // 特别记录并确认重要的认证头信息
+        const authToken =
+          req.headers['authorization'] || req.headers['bspa_access_token']
+        if (authToken) {
+          const headerName = req.headers['authorization']
+            ? 'authorization'
+            : 'bspa_access_token'
+          logger.info(
+            `保存了认证头信息 (session ${sessionId}): ${headerName}=${Array.isArray(authToken) ? authToken[0] : authToken}`,
+          )
+        } else {
+          logger.warn(
+            `警告：客户端连接缺少认证头 (session ${sessionId}), 这可能导致API调用失败`,
+          )
+        }
+
+        sessionHeaders[sessionId] = cleanHeaders
+        logger.info(
+          `Saved client headers for session ${sessionId}: ${JSON.stringify(Object.keys(cleanHeaders))}`,
+        )
+      }
+
+      // Connect to MCP server
+      logger.info(`Connecting transport to MCP server...`)
+      await mcpServer.connect(sseTransport)
+      logger.info(`Transport connected to MCP server successfully`)
+
+      if (sessionId) {
+        transports[sessionId] = sseTransport
+        logger.info(`SSE session established: ${sessionId}`)
+        logger.info(`Active sessions: ${Object.keys(transports).length}`)
+      } else {
+        logger.warn(`SSE transport created but no sessionId assigned`)
+      }
+
+      // Cleanup on client disconnect
+      req.on('close', () => {
+        if (sessionId) {
+          logger.info(`Client disconnected (session ${sessionId})`)
+          delete transports[sessionId]
+        } else {
+          logger.info(`Client disconnected (no session ID)`)
+        }
+      })
+
+      // Handle SSE errors
+      sseTransport.onerror = (err) => {
+        if (sessionId) {
+          logger.error(`SSE error (session ${sessionId}):`, err)
+          delete transports[sessionId]
+        } else {
+          logger.error(`SSE error (no session ID):`, err)
+        }
+      }
+
+      // Handle SSE closure
+      sseTransport.onclose = () => {
+        if (sessionId) {
+          logger.info(`SSE connection closed (session ${sessionId})`)
+          delete transports[sessionId]
+        } else {
+          logger.info(`SSE connection closed (no session ID)`)
+        }
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error)
+      logger.error(`SSE connection failed: ${msg}`, error)
+
+      // Prevent double response
+      if (!res.headersSent && !responseHandled) {
+        responseHandled = true
+        res.status(500).end(`SSE connection failed: ${msg}`)
+      }
+    }
+  })
+
+  // Message endpoint handler function
+  async function handleMessageRequest(
+    req: express.Request,
+    res: express.Response,
+  ) {
+    // Track response status to prevent multiple responses
+    let responseHandled = false
+
+    // Get session ID from request
+    const sessionId =
+      typeof req.query.sessionId === 'string'
+        ? req.query.sessionId
+        : (req.headers['mcp-session-id'] as string) ||
+          (req.headers['x-session-id'] as string)
+
+    logger.debug(`Message request for session: ${sessionId}`)
+    logger.debug(`Request headers: ${JSON.stringify(req.headers)}`)
+
+    // Log request body if present
+    if (req.body) {
+      logger.info(`Request body: ${JSON.stringify(req.body)}`)
+    }
+
+    // If raw body was saved during parsing, log it
+    if ((req as any).rawBody) {
+      logger.debug(`Raw request body: ${(req as any).rawBody}`)
+    }
+
+    if (args.headers && !res.headersSent) {
+      setResponseHeaders({
+        res,
+        headers: args.headers,
+      })
+    }
+
+    // Validate session
+    if (!sessionId) {
+      logger.error('Message request missing session ID')
+
+      // Auto-select the only available session if there's exactly one
+      const sessionIds = Object.keys(transports)
+      if (sessionIds.length === 1) {
+        const autoSessionId = sessionIds[0]
+        logger.info(
+          `Auto-selecting the only available session: ${autoSessionId}`,
+        )
+
+        // Continue with this session ID
+        return await processMessageWithSession(
+          autoSessionId,
+          req,
+          res,
+          responseHandled,
+        )
+      }
+
+      if (!res.headersSent && !responseHandled) {
+        responseHandled = true
+        return res.status(400).json({
+          jsonrpc: '2.0',
+          error: {
+            code: -32602,
+            message: 'Missing session ID',
+          },
+          id: null,
+        })
+      }
+      return
+    }
+
+    return await processMessageWithSession(sessionId, req, res, responseHandled)
+  }
+
+  // Helper to process message with a validated session ID
+  async function processMessageWithSession(
+    sessionId: string,
+    req: express.Request,
+    res: express.Response,
+    responseHandled: boolean,
+  ) {
+    const transport = transports[sessionId]
+    if (!transport) {
+      logger.error(`Session ${sessionId} not found`)
+
+      if (!res.headersSent && !responseHandled) {
+        return res.status(404).json({
+          jsonrpc: '2.0',
+          error: {
+            code: -32602,
+            message: `Session ${sessionId} not found or expired`,
+          },
+          id: null,
+        })
+      }
+      return
+    }
+
+    try {
+      // 设置当前处理的会话ID，让工具调用能找到正确会话的头信息
+      currentSessionId = sessionId
+
+      // Let the transport handle the message
+      logger.info(
+        `Handling message for session ${sessionId} using transport.handlePostMessage`,
+      )
+
+      try {
+        // 确保请求体被正确解析
+        let parsedBody
+
+        // 如果req.body已经有了，说明已经被某个中间件解析过了
+        if (req.body && typeof req.body === 'object') {
+          parsedBody = req.body
+          logger.debug(
+            `Using already parsed request body: ${JSON.stringify(parsedBody)}`,
+          )
+        }
+        // 否则从请求体中读取
+        else {
+          // 读取原始请求体
+          let rawBody = ''
+
+          // 如果之前保存过原始请求体，则直接使用
+          if ((req as any).rawBody) {
+            rawBody = (req as any).rawBody
+            logger.debug(`Using stored raw body: ${rawBody}`)
+          }
+          // 否则直接从请求流中读取
+          else {
+            // 确保请求体存在
+            if (!req.readable) {
+              logger.error(`Request body stream is not readable`)
+            } else {
+              for await (const chunk of req) {
+                rawBody += chunk.toString('utf8')
+              }
+              logger.debug(`Read raw body from request stream: ${rawBody}`)
+            }
+          }
+
+          // 解析JSON请求体
+          if (rawBody) {
+            try {
+              parsedBody = JSON.parse(rawBody)
+              logger.info(`Parsed request body: ${JSON.stringify(parsedBody)}`)
+            } catch (parseError) {
+              logger.error(
+                `Failed to parse JSON body: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+              )
+              throw new Error(
+                `Failed to parse JSON request body: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+              )
+            }
+          } else {
+            logger.warn(`Empty request body`)
+            parsedBody = {}
+          }
+        }
+
+        // 直接处理tools/call请求，拦截它们不传递给transport
+        if (
+          parsedBody &&
+          parsedBody.method === 'tools/call' &&
+          parsedBody.params
+        ) {
+          logger.info(`===== 直接拦截并处理tools/call请求 =====`)
+
+          const { name, arguments: toolArgs = {} } = parsedBody.params
+          logger.info(`工具名: ${name}, 参数: ${JSON.stringify(toolArgs)}`)
+
+          // 查找工具
+          const tool = mcpTemplate.tools.find((t) => t.name === name)
+          if (!tool) {
+            logger.error(`找不到工具: ${name}`)
+
+            // 通过SSE传输发送错误响应
+            try {
+              await transport.send({
+                jsonrpc: '2.0' as const,
+                error: {
+                  code: -32601,
+                  message: `找不到工具: ${name}`,
+                },
+                id: parsedBody.id,
+              })
+              logger.info(`已通过SSE传输发送错误响应：找不到工具: ${name}`)
+            } catch (sendError) {
+              logger.error(
+                `通过SSE传输发送错误响应失败: ${sendError instanceof Error ? sendError.message : String(sendError)}`,
+              )
+            }
+
+            // 同时通过HTTP响应返回结果
+            if (!res.headersSent) {
+              return res.status(404).json({
+                jsonrpc: '2.0' as const,
+                error: {
+                  code: -32601,
+                  message: `找不到工具: ${name}`,
+                },
+                id: parsedBody.id,
+              })
+            }
+            return
+          }
+
+          logger.info(`找到工具: ${name}, 开始执行`)
+
+          // 设置超时处理
+          const TIMEOUT_MS = 30000 // 30秒超时
+          let isResponseSent = false
+          const timeoutId = setTimeout(() => {
+            if (isResponseSent) return
+            isResponseSent = true
+            logger.warn(`工具 ${name} 执行超时 (${TIMEOUT_MS}ms)`)
+
+            // 通过SSE传输发送超时响应
+            try {
+              transport
+                .send({
+                  jsonrpc: '2.0' as const,
+                  error: {
+                    code: -32000,
+                    message: `工具执行超时: ${name}`,
+                  },
+                  id: parsedBody.id,
+                })
+                .catch((e) => {
+                  logger.error(
+                    `发送超时响应失败: ${e instanceof Error ? e.message : String(e)}`,
+                  )
+                })
+            } catch (sendError) {
+              logger.error(
+                `发送超时响应失败: ${sendError instanceof Error ? sendError.message : String(sendError)}`,
+              )
+            }
+
+            // 通过HTTP也返回超时响应
+            if (!res.headersSent) {
+              res.status(504).json({
+                jsonrpc: '2.0' as const,
+                error: {
+                  code: -32000,
+                  message: `工具执行超时: ${name}`,
+                },
+                id: parsedBody.id,
+              })
+            }
+          }, TIMEOUT_MS)
+
+          try {
+            // 执行API调用
+            const result = await handleMcpRequest(
+              name,
+              toolArgs,
+              tool,
+              args.apiHost,
+              args.headers || {},
+              logger,
+              sessionHeaders[sessionId],
+            )
+
+            // 清除超时
+            clearTimeout(timeoutId)
+            if (isResponseSent) {
+              logger.warn(`工具 ${name} 在超时后返回结果，忽略`)
+              return
+            }
+            isResponseSent = true
+
+            // 处理结果
+            let formattedResult
+            if (typeof result === 'string') {
+              try {
+                // 尝试解析JSON字符串
+                formattedResult = JSON.parse(result)
+              } catch {
+                // 如果不是有效的JSON，则保持字符串格式
+                formattedResult = result
+              }
+            } else if (result && result.error) {
+              formattedResult = {
+                error: result.error,
+                toolName: name,
+                timestamp: new Date().toISOString(),
+              }
+            } else if (
+              result === null ||
+              result === undefined ||
+              (typeof result === 'object' && Object.keys(result).length === 0)
+            ) {
+              formattedResult = {
+                message: 'API调用成功但返回了空结果',
+                toolName: name,
+                timestamp: new Date().toISOString(),
+              }
+            } else {
+              formattedResult = result
+            }
+
+            logger.info(
+              `工具 ${name} 执行结果: ${JSON.stringify(formattedResult).substring(0, 200)}${JSON.stringify(formattedResult).length > 200 ? '...' : ''}`,
+            )
+
+            // 构造标准JSON-RPC响应
+            const responseObj = {
+              jsonrpc: '2.0' as const,
+              result: {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(formattedResult, null, 2),
+                  },
+                ],
+              },
+              id: parsedBody.id,
+            }
+
+            // 首先通过SSE传输发送响应
+            try {
+              await transport.send(responseObj)
+              logger.info(`已通过SSE传输发送工具 ${name} 的响应结果`)
+            } catch (sendError) {
+              logger.error(
+                `通过SSE传输发送响应失败: ${sendError instanceof Error ? sendError.message : String(sendError)}`,
+              )
+
+              // SSE发送失败时，尝试通过HTTP响应返回结果
+              if (!res.headersSent) {
+                return res.json(responseObj)
+              }
+            }
+
+            // 完成HTTP响应
+            if (!res.headersSent) {
+              return res.json({
+                jsonrpc: '2.0' as const,
+                result: 'Success',
+                id: parsedBody.id,
+              })
+            }
+
+            return
+          } catch (error) {
+            // 清除超时
+            clearTimeout(timeoutId)
+            if (isResponseSent) return
+            isResponseSent = true
+
+            const msg = error instanceof Error ? error.message : String(error)
+            logger.error(`工具执行失败 (${name}): ${msg}`, error)
+
+            // 构造错误响应
+            const errorResponse = {
+              jsonrpc: '2.0' as const,
+              error: {
+                code: -32603,
+                message: `内部错误: ${msg}`,
+              },
+              id: parsedBody.id,
+            }
+
+            // 首先通过SSE传输发送错误响应
+            try {
+              await transport.send(errorResponse)
+              logger.info(`已通过SSE传输发送错误响应`)
+            } catch (sendError) {
+              logger.error(
+                `通过SSE传输发送错误响应失败: ${sendError instanceof Error ? sendError.message : String(sendError)}`,
+              )
+
+              // SSE发送失败时，尝试通过HTTP响应返回错误
+              if (!res.headersSent) {
+                return res.status(500).json(errorResponse)
+              }
+            }
+
+            // 完成HTTP响应
+            if (!res.headersSent) {
+              return res.status(500).json(errorResponse)
+            }
+
+            return
+          }
+        }
+
+        logger.info(
+          `Calling handlePostMessage with parsed body: ${JSON.stringify(parsedBody)}`,
+        )
+        await transport.handlePostMessage(req, res, parsedBody)
+        logger.info(
+          `handlePostMessage completed successfully for session ${sessionId}`,
+        )
+      } catch (postError) {
+        const msg =
+          postError instanceof Error ? postError.message : String(postError)
+        logger.error(
+          `Failed to handle message (session ${sessionId}): ${msg}`,
+          postError,
+        )
+
+        // Return proper JSON-RPC error response if headers haven't been sent
+        if (!res.headersSent) {
+          res.status(500).json({
+            jsonrpc: '2.0',
+            error: {
+              code: -32603,
+              message: `Internal error: ${msg}`,
+            },
+            id: null,
+          })
+        }
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error)
+      logger.error(
+        `Failed to handle message (session ${sessionId}): ${msg}`,
+        error,
+      )
+
+      // Return proper JSON-RPC error response if headers haven't been sent
+      if (!res.headersSent) {
+        return res.status(500).json({
+          jsonrpc: '2.0',
+          error: {
+            code: -32603,
+            message: `Internal error: ${msg}`,
+          },
+          id: null,
+        })
+      }
+    }
+  }
+
+  // Register message endpoint
+  app.post(args.messagePath, async (req, res) => {
+    await handleMessageRequest(req, res)
+  })
+
+  // Additionally, register a tools/call handler to properly handle the general-purpose MCP tool call format
+  mcpServer.tool(
+    'tools/call',
+    'Call a tool by name with arguments',
+    {
+      name: z.string().describe('Tool name to call'),
+      arguments: z.record(z.any()).optional().describe('Tool arguments'),
+    },
+    async (params) => {
+      try {
+        logger.info(`========== TOOLS/CALL HANDLER ==========`)
+        logger.info(
+          `Received tools/call request with params: ${JSON.stringify(params)}`,
+        )
+
+        const { name, arguments: toolArgs = {} } = params
+
+        // Find the tool by name
+        const tool = mcpTemplate.tools.find((t) => t.name === name)
+        if (!tool) {
+          logger.error(`Tool not found: ${name}`)
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    error: `Tool not found: ${name}`,
+                    timestamp: new Date().toISOString(),
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          }
+        }
+
+        logger.info(
+          `Found tool: ${name}, executing with arguments: ${JSON.stringify(toolArgs)}`,
+        )
+
+        // Get client headers
+        const sessionId = currentSessionId
+        const clientHeaders = sessionId ? sessionHeaders[sessionId] : undefined
+
+        // Call the tool implementation
+        const result = await handleMcpRequest(
+          name,
+          toolArgs,
+          tool,
+          args.apiHost, // Using the apiHost from the top-level args parameter
+          args.headers || {}, // Using the headers from the top-level args parameter
+          logger,
+          clientHeaders,
+        )
+
+        // Process result
+        let resultText = ''
+        if (typeof result === 'string') {
+          resultText = result
+        } else if (result && result.error) {
+          resultText = JSON.stringify(
+            {
+              error: result.error,
+              toolName: name,
+              timestamp: new Date().toISOString(),
+            },
+            null,
+            2,
+          )
+        } else if (
+          result === null ||
+          result === undefined ||
+          (typeof result === 'object' && Object.keys(result).length === 0)
+        ) {
+          resultText = JSON.stringify(
+            {
+              message: 'API调用成功但返回了空结果',
+              toolName: name,
+              timestamp: new Date().toISOString(),
+            },
+            null,
+            2,
+          )
+        } else {
+          try {
+            resultText = JSON.stringify(result, null, 2)
+          } catch (error) {
+            resultText = `Unable to serialize result: ${String(result)}`
+          }
+        }
+
+        logger.info(
+          `tools/call result for ${name}: ${
+            resultText.length > 200
+              ? resultText.substring(0, 200) + '...'
+              : resultText
+          }`,
+        )
+        logger.info(`========== TOOLS/CALL HANDLER FINISHED ==========`)
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: resultText,
+            },
+          ],
         }
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error)
-        logger.error(
-          `Failed to handle SSE message (session ${sessionId}): ${msg}`,
-          error,
-        )
-        res.status(500).send(`Failed to handle message: ${msg}`)
+        logger.error(`tools/call execution failed: ${msg}`, error)
+        logger.error(`========== TOOLS/CALL HANDLER FAILED ==========`)
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Execution failed: ${msg}`,
+            },
+          ],
+        }
       }
-    })()
-  })
+    },
+  )
 
   // Start server
   const server = app.listen(args.port, () => {
-    logger.info(`Server started successfully:`)
-    logger.info(`- Listening port: ${args.port}`)
+    logger.info(`API->SSE Gateway started successfully:`)
+    logger.info(`- Listening on port: ${args.port}`)
     logger.info(`- SSE endpoint: http://localhost:${args.port}${args.ssePath}`)
     logger.info(
       `- Message endpoint: http://localhost:${args.port}${args.messagePath}`,
     )
-    logger.info(`- Health check endpoint: http://localhost:${args.port}/health`)
-    logger.info(`- Status check endpoint: http://localhost:${args.port}/status`)
-    logger.info(`- MCP config file: http://localhost:${args.port}/mcp-config`)
-    logger.info(
-      `- Supports automatic detection and conversion of OpenAPI specification files`,
-    )
+    logger.info(`- Health endpoint: http://localhost:${args.port}/health`)
+    logger.info(`- Config endpoint: http://localhost:${args.port}/mcp-config`)
   })
 
-  // Graceful shutdown
+  // Handle graceful shutdown
   const cleanup = () => {
     logger.info('Shutting down server...')
+
     server.close(() => {
       logger.info('Server closed')
       process.exit(0)
     })
 
-    // Close all sessions
-    Object.keys(sessions).forEach((sid) => {
+    // Close all transports
+    Object.keys(transports).forEach((sid) => {
       logger.info(`Closing session: ${sid}`)
-      delete sessions[sid]
+      delete transports[sid]
     })
 
-    // Exit forcefully after 5 seconds
+    // Force exit after 5 seconds
     setTimeout(() => {
       logger.warn('Force exit')
       process.exit(1)
     }, 5000)
   }
 
-  // Handle process signals
-  process.on('SIGINT', cleanup)
-  process.on('SIGTERM', cleanup)
+  // Register signal handlers
+  onSignals({
+    logger,
+    cleanup,
+  })
 
   return server
 }
