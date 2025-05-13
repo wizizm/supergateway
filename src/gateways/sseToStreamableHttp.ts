@@ -114,7 +114,15 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
       client = new Client({ name: 'supergateway', version: getVersion() })
       sseTransport = new SSEClientTransport(new URL(sseUrl), {
         requestInit: { headers },
-        eventSourceInit: {}, // EventSource does not support custom headers
+        eventSourceInit: {
+          fetch: (...props: Parameters<typeof fetch>) => {
+            const [url, init = {}] = props
+            return fetch(url, {
+              ...init,
+              headers: { ...init.headers, ...headers },
+            })
+          },
+        },
       })
 
       setupSseEventHandlers()
@@ -382,7 +390,15 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
                     new URL(sseUrl),
                     {
                       requestInit: { headers: currentHeaders },
-                      eventSourceInit: {}, // EventSource does not support custom headers
+                      eventSourceInit: {
+                        fetch: (...props: Parameters<typeof fetch>) => {
+                          const [url, init = {}] = props
+                          return fetch(url, {
+                            ...init,
+                            headers: { ...init.headers, ...currentHeaders },
+                          })
+                        },
+                      },
                     },
                   )
 
@@ -429,7 +445,15 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
                     new URL(sseUrl),
                     {
                       requestInit: { headers: currentHeaders },
-                      eventSourceInit: {}, // EventSource does not support custom headers
+                      eventSourceInit: {
+                        fetch: (...props: Parameters<typeof fetch>) => {
+                          const [url, init = {}] = props
+                          return fetch(url, {
+                            ...init,
+                            headers: { ...init.headers, ...currentHeaders },
+                          })
+                        },
+                      },
                     },
                   )
 
@@ -484,7 +508,15 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
                     new URL(sseUrl),
                     {
                       requestInit: { headers: currentHeaders },
-                      eventSourceInit: {}, // EventSource does not support custom headers
+                      eventSourceInit: {
+                        fetch: (...props: Parameters<typeof fetch>) => {
+                          const [url, init = {}] = props
+                          return fetch(url, {
+                            ...init,
+                            headers: { ...init.headers, ...currentHeaders },
+                          })
+                        },
+                      },
                     },
                   )
 
