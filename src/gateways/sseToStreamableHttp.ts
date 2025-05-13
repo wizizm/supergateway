@@ -28,6 +28,12 @@ interface Session {
   pendingResponses: Map<string | number, JSONRPCMessage>
 }
 
+// Reconnection parameters
+const INITIAL_RECONNECT_DELAY = 1000 // 1 second
+const MAX_RECONNECT_DELAY = 30000 // 30 seconds
+const RECONNECT_BACKOFF_FACTOR = 1.5
+const MAX_RECONNECT_ATTEMPTS = 10
+
 const setResponseHeaders = ({
   res,
   headers,
@@ -66,23 +72,10 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
 
   onSignals({ logger })
 
-  // Connect to SSE server
-  const client = new Client({ name: 'supergateway', version: getVersion() })
-  const sseTransport = new SSEClientTransport(new URL(sseUrl), {
-    requestInit: { headers },
-    eventSourceInit: {}, // EventSource does not support custom headers
-  })
-
-  try {
-    await client.connect(sseTransport)
-    logger.info(`Connected to SSE server: ${sseUrl}`)
-  } catch (error) {
-    logger.error(`Failed to connect to SSE server: ${error}`)
-    process.exit(1)
-  }
-
   // Session storage
   const sessions = new Map<string, Session>()
+  // Store session auth headers
+  const sessionAuthHeaders = new Map<string, Record<string, string>>()
 
   // Set up Express application
   const app = express()
@@ -104,6 +97,130 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
     })
   }
 
+  // Connect to SSE server with reconnection support
+  let client: Client
+  let sseTransport: SSEClientTransport
+  let reconnectAttempts = 0
+  let reconnectDelay = INITIAL_RECONNECT_DELAY
+  let isConnecting = false
+  let isShuttingDown = false
+
+  // Function to create and connect to SSE server
+  async function connectToSseServer() {
+    if (isConnecting || isShuttingDown) return
+
+    isConnecting = true
+    try {
+      client = new Client({ name: 'supergateway', version: getVersion() })
+      sseTransport = new SSEClientTransport(new URL(sseUrl), {
+        requestInit: { headers },
+        eventSourceInit: {}, // EventSource does not support custom headers
+      })
+
+      setupSseEventHandlers()
+
+      await client.connect(sseTransport)
+      logger.info(`Connected to SSE server: ${sseUrl}`)
+
+      // Reset reconnection parameters on successful connection
+      reconnectAttempts = 0
+      reconnectDelay = INITIAL_RECONNECT_DELAY
+    } catch (error) {
+      logger.error(`Failed to connect to SSE server: ${error}`)
+      handleReconnect()
+    } finally {
+      isConnecting = false
+    }
+  }
+
+  // Reconnection handler with exponential backoff
+  function handleReconnect() {
+    if (isShuttingDown) return
+
+    reconnectAttempts++
+
+    if (reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
+      logger.error(
+        `Exceeded maximum reconnection attempts (${MAX_RECONNECT_ATTEMPTS}). Please check the SSE server or restart the gateway manually.`,
+      )
+      return
+    }
+
+    logger.info(
+      `Attempting to reconnect to SSE server in ${reconnectDelay}ms (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`,
+    )
+
+    setTimeout(async () => {
+      await connectToSseServer()
+
+      // Increase delay for next attempt (with exponential backoff)
+      reconnectDelay = Math.min(
+        reconnectDelay * RECONNECT_BACKOFF_FACTOR,
+        MAX_RECONNECT_DELAY,
+      )
+    }, reconnectDelay)
+  }
+
+  // Set up event handlers for SSE transport
+  function setupSseEventHandlers() {
+    // Handle notification messages sent by SSE server
+    const originalOnMessage = sseTransport.onmessage
+    sseTransport.onmessage = (msg: JSONRPCMessage) => {
+      // If it's a notification message, broadcast to all sessions
+      if ('method' in msg && !('id' in msg)) {
+        logger.info(`SSE notification → StreamableHTTP: ${JSON.stringify(msg)}`)
+        try {
+          // Broadcast notification to all active sessions
+          for (const [sid, session] of sessions.entries()) {
+            try {
+              session.transport.send(msg)
+            } catch (err) {
+              logger.error(
+                `Failed to forward notification to session ${sid}:`,
+                err,
+              )
+            }
+          }
+        } catch (err) {
+          logger.error(`Failed to forward notification:`, err)
+        }
+      }
+
+      // Call the original onmessage handler
+      if (originalOnMessage) {
+        originalOnMessage(msg)
+      }
+    }
+
+    // Handle SSE connection errors
+    sseTransport.onerror = (error) => {
+      logger.error(`SSE connection error: ${error}`)
+
+      try {
+        // Try to close the transport cleanly
+        sseTransport.close()
+      } catch (closeError) {
+        logger.error(`Error closing SSE transport: ${closeError}`)
+      }
+
+      // Attempt to reconnect
+      handleReconnect()
+    }
+
+    // Handle SSE connection closure
+    sseTransport.onclose = () => {
+      logger.error('SSE connection closed unexpectedly')
+
+      if (!isShuttingDown) {
+        // Attempt to reconnect
+        handleReconnect()
+      }
+    }
+  }
+
+  // Initial connection
+  await connectToSseServer()
+
   // Register Streamable HTTP handler
   app.all(httpPath, async (req, res) => {
     // 合并 header 时，优先用客户端 header，其次 gateway header
@@ -116,6 +233,22 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
     const mergedHeaders = {
       ...lowerCaseHeaders(headers), // gateway header
       ...lowerCaseHeaders(req.headers), // 客户端 header，优先级最高
+    }
+
+    // Extract authentication headers
+    const authHeaders: Record<string, string> = {}
+    for (const [key, value] of Object.entries(mergedHeaders)) {
+      if (
+        key.includes('token') ||
+        key.includes('auth') ||
+        key.includes('key')
+      ) {
+        if (typeof value === 'string') {
+          authHeaders[key] = value
+        } else if (Array.isArray(value) && value.length > 0) {
+          authHeaders[key] = String(value[0])
+        }
+      }
     }
 
     const requestHeaders: Record<string, string | string[]> = {}
@@ -143,8 +276,31 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
     logger.info(`Request body: ${JSON.stringify(req.body)}`)
 
     try {
+      // Check if SSE connection is active, if not try to reconnect
+      if (!client || !sseTransport) {
+        logger.warn('SSE connection is not active, attempting to reconnect...')
+        await connectToSseServer()
+
+        // If still not connected after reconnect attempt, return error
+        if (!client || !sseTransport) {
+          logger.error(
+            'Failed to reconnect to SSE server, cannot process request',
+          )
+          res
+            .status(503)
+            .send('Service Unavailable: Cannot connect to SSE server')
+          return
+        }
+      }
+
       // Check if session already exists
       let session = sessions.get(sessionId)
+
+      // Store auth headers for this session
+      sessionAuthHeaders.set(sessionId, authHeaders)
+      logger.info(
+        `Auth headers stored for session ${sessionId}: ${JSON.stringify(authHeaders)}`,
+      )
 
       if (!session) {
         logger.info(`Creating new session for ${sessionId}`)
@@ -185,6 +341,16 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
               const method = msg.method
               const params = (msg as any).params || {}
 
+              // Get stored auth headers for this session
+              const sessionAuth = sessionAuthHeaders.get(sessionId) || {}
+              // Combine gateway headers with session auth headers
+              const currentHeaders = { ...headers, ...sessionAuth }
+
+              // Log the headers being used for this request
+              logger.info(
+                `Using auth headers for tool call in session ${sessionId}: ${JSON.stringify(sessionAuth)}`,
+              )
+
               // Use client interface to send requests
               let response: any
               switch (method) {
@@ -208,43 +374,153 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
                   break
                 case 'tools/list':
                   // Tools list request
-                  const toolsResult = await client.listTools()
-                  response = {
-                    jsonrpc: '2.0',
-                    id: msg.id,
-                    result: toolsResult,
+                  const resourcesClient = new Client({
+                    name: 'supergateway',
+                    version: getVersion(),
+                  })
+                  const resourcesSseTransport = new SSEClientTransport(
+                    new URL(sseUrl),
+                    {
+                      requestInit: { headers: currentHeaders },
+                      eventSourceInit: {}, // EventSource does not support custom headers
+                    },
+                  )
+
+                  try {
+                    await resourcesClient.connect(resourcesSseTransport)
+                    logger.info(
+                      `Connected to SSE server with auth for resources/list`,
+                    )
+
+                    const resourcesResult = await resourcesClient.listTools()
+                    response = {
+                      jsonrpc: '2.0',
+                      id: msg.id,
+                      result: resourcesResult,
+                    }
+
+                    resourcesSseTransport.close()
+                  } catch (error) {
+                    logger.error(`Resources list error: ${error}`)
+                    response = {
+                      jsonrpc: '2.0',
+                      id: msg.id,
+                      error: {
+                        code: -32603,
+                        message: `Resources list failed: ${error}`,
+                      },
+                    }
+                    try {
+                      resourcesSseTransport.close()
+                    } catch (closeErr) {
+                      logger.error(
+                        `Error closing resources SSE transport: ${closeErr}`,
+                      )
+                    }
                   }
                   break
                 case 'tools/call':
-                  // Tool call request
-                  const callResult = await client.callTool({
-                    name: params.name,
-                    arguments: params.arguments,
+                  // Tool call request - create a new client with auth headers
+                  const toolClient = new Client({
+                    name: 'supergateway',
+                    version: getVersion(),
                   })
-                  response = {
-                    jsonrpc: '2.0',
-                    id: msg.id,
-                    result: callResult,
-                  }
-                  break
-                case 'resources/list':
-                  // Resources list request
-                  const resourcesResult = await client.listResources()
-                  response = {
-                    jsonrpc: '2.0',
-                    id: msg.id,
-                    result: resourcesResult,
+                  const toolSseTransport = new SSEClientTransport(
+                    new URL(sseUrl),
+                    {
+                      requestInit: { headers: currentHeaders },
+                      eventSourceInit: {}, // EventSource does not support custom headers
+                    },
+                  )
+
+                  try {
+                    await toolClient.connect(toolSseTransport)
+                    logger.info(
+                      `Connected to SSE server with auth for tool call: ${params.name}`,
+                    )
+
+                    // Make the authenticated tool call
+                    const callResult = await toolClient.callTool({
+                      name: params.name,
+                      arguments: params.arguments,
+                    })
+
+                    response = {
+                      jsonrpc: '2.0',
+                      id: msg.id,
+                      result: callResult,
+                    }
+
+                    // Close the temporary transport instead of disconnecting client
+                    toolSseTransport.close()
+                  } catch (error) {
+                    logger.error(`Tool call error (${params.name}): ${error}`)
+                    response = {
+                      jsonrpc: '2.0',
+                      id: msg.id,
+                      error: {
+                        code: -32603,
+                        message: `Tool call failed: ${error}`,
+                      },
+                    }
+
+                    // Clean up in case of error
+                    try {
+                      toolSseTransport.close()
+                    } catch (closeErr) {
+                      logger.error(
+                        `Error closing tool SSE transport: ${closeErr}`,
+                      )
+                    }
                   }
                   break
                 case 'resources/read':
                   // Resource read request
-                  const readResult = await client.readResource({
-                    uri: params.uri,
+                  const readClient = new Client({
+                    name: 'supergateway',
+                    version: getVersion(),
                   })
-                  response = {
-                    jsonrpc: '2.0',
-                    id: msg.id,
-                    result: readResult,
+                  const readSseTransport = new SSEClientTransport(
+                    new URL(sseUrl),
+                    {
+                      requestInit: { headers: currentHeaders },
+                      eventSourceInit: {}, // EventSource does not support custom headers
+                    },
+                  )
+
+                  try {
+                    await readClient.connect(readSseTransport)
+                    logger.info(
+                      `Connected to SSE server with auth for resources/read: ${params.uri}`,
+                    )
+
+                    const readResult = await readClient.readResource({
+                      uri: params.uri,
+                    })
+                    response = {
+                      jsonrpc: '2.0',
+                      id: msg.id,
+                      result: readResult,
+                    }
+
+                    readSseTransport.close()
+                  } catch (error) {
+                    logger.error(`Resource read error: ${error}`)
+                    response = {
+                      jsonrpc: '2.0',
+                      id: msg.id,
+                      error: {
+                        code: -32603,
+                        message: `Resource read failed: ${error}`,
+                      },
+                    }
+                    try {
+                      readSseTransport.close()
+                    } catch (closeErr) {
+                      logger.error(
+                        `Error closing read SSE transport: ${closeErr}`,
+                      )
+                    }
                   }
                   break
                 default:
@@ -296,6 +572,7 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
         transport.onclose = () => {
           logger.info(`StreamableHTTP connection closed (session ${sessionId})`)
           sessions.delete(sessionId)
+          sessionAuthHeaders.delete(sessionId)
           logger.info(
             `Session ${sessionId} deleted, remaining sessions: ${sessions.size}`,
           )
@@ -308,6 +585,7 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
             logger.error(`Error stack: ${err.stack}`)
           }
           sessions.delete(sessionId)
+          sessionAuthHeaders.delete(sessionId)
           logger.info(
             `Session ${sessionId} deleted due to error, remaining sessions: ${sessions.size}`,
           )
@@ -331,6 +609,7 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
       }
       res.status(500).send(`Internal Server Error: ${msg}`)
       sessions.delete(sessionId)
+      sessionAuthHeaders.delete(sessionId)
       logger.info(
         `Session ${sessionId} deleted due to error, remaining sessions: ${sessions.size}`,
       )
@@ -346,49 +625,49 @@ export async function sseToStreamableHttp(args: SseToStreamableHttpArgs) {
   })
 
   // Start server
-  app.listen(port, () => {
+  const server = app.listen(port, () => {
     logger.info(`Listening on port ${port}`)
     logger.info(`Streamable HTTP endpoint: http://localhost:${port}${httpPath}`)
   })
 
-  // Handle notification messages sent by SSE server
-  const originalOnMessage = sseTransport.onmessage
-  sseTransport.onmessage = (msg: JSONRPCMessage) => {
-    // If it's a notification message, broadcast to all sessions
-    if ('method' in msg && !('id' in msg)) {
-      logger.info(`SSE notification → StreamableHTTP: ${JSON.stringify(msg)}`)
+  // Implement graceful shutdown
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'))
+
+  async function gracefulShutdown(signal: string) {
+    logger.info(`Received ${signal} signal, shutting down gracefully...`)
+    isShuttingDown = true
+
+    // Close HTTP server
+    server.close(() => {
+      logger.info('HTTP server closed')
+    })
+
+    // Close SSE connection
+    try {
+      if (sseTransport) {
+        sseTransport.close()
+        logger.info('SSE connection closed')
+      }
+    } catch (error) {
+      logger.error(`Error closing SSE connection: ${error}`)
+    }
+
+    // Close all session connections
+    for (const [sessionId, session] of sessions.entries()) {
       try {
-        // Broadcast notification to all active sessions
-        for (const [sid, session] of sessions.entries()) {
-          try {
-            session.transport.send(msg)
-          } catch (err) {
-            logger.error(
-              `Failed to forward notification to session ${sid}:`,
-              err,
-            )
-          }
-        }
-      } catch (err) {
-        logger.error(`Failed to forward notification:`, err)
+        session.transport.close()
+        logger.info(`Closed session ${sessionId}`)
+      } catch (error) {
+        logger.error(`Error closing session ${sessionId}: ${error}`)
       }
     }
 
-    // Call the original onmessage handler
-    if (originalOnMessage) {
-      originalOnMessage(msg)
-    }
-  }
+    logger.info('Graceful shutdown completed')
 
-  // Handle SSE connection errors
-  sseTransport.onerror = (error) => {
-    logger.error(`SSE connection error: ${error}`)
-    process.exit(1)
-  }
-
-  // Handle SSE connection closure
-  sseTransport.onclose = () => {
-    logger.error('SSE connection closed')
-    process.exit(1)
+    // Give some time for final logs to be written
+    setTimeout(() => {
+      process.exit(0)
+    }, 1000)
   }
 }
