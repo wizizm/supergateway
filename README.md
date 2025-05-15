@@ -8,6 +8,15 @@
 2. Converting **OpenAPI 3.0.1** interface definitions to **MCP tools**
 3. Providing seamless interoperability between different MCP transport protocols
 
+## Recent Updates
+
+- **May 25, 2024**: Added robust reconnection mechanisms for both SSE and stdio services, implementing exponential backoff strategy and maximum retry limits to prevent service interruptions due to connection failures.
+- **November 18, 2024**: Enhanced authentication header handling with improved fetch interception, centralized auth header management, and multi-layer auth propagation to solve "login timeout" errors.
+- **May 20, 2024**: Optimized the apiToSse.ts module based on the official MCP SSE server example, improving code structure, error handling, and session management.
+- **May 19, 2024**: Fixed OpenAPI to MCP URL building issues and verified cross-API compatibility.
+- **May 18, 2024**: Improved MCP service generation by referencing the Higress openapi-to-mcpserver project.
+- **May 16, 2024**: Fixed CherryStudio compatibility issues with the MCP service.
+
 ## Key Features
 
 ### Protocol Conversion
@@ -335,9 +344,153 @@ npx -y @gfsopen/supergateway --port 8000 --stdio "npx -y @modelcontextprotocol/s
 
 ngrok http 8000
 
-```
+````
 
 The MCP server will be available at a URL similar to: https://1234-567-890-12-456.ngrok-free.app/sse
+
+## Troubleshooting SSE Connections
+
+If you encounter issues with SSE connections or tool calls not being processed:
+
+1. **Check Session IDs**: Ensure the client is using the session ID returned by the server in the SSE response headers:
+   ```javascript
+   // Example JavaScript client code
+   const sseConnection = new EventSource('/sse');
+   let sessionId;
+
+   sseConnection.onopen = (event) => {
+     // Get session ID from response headers
+     sessionId = event.target.getResponseHeader('mcp-session-id');
+     console.log('Connected with session ID:', sessionId);
+   };
+
+   // Use that session ID for message requests
+   async function callTool(toolName, parameters) {
+     const response = await fetch('/message', {
+       method: 'POST',
+       headers: {
+         'Content-Type': 'application/json',
+         'mcp-session-id': sessionId
+       },
+       body: JSON.stringify({
+         jsonrpc: '2.0',
+         method: 'tools/call',
+         params: { name: toolName, arguments: parameters },
+         id: Date.now()
+       })
+     });
+     return await response.json();
+   }
+````
+
+2. **Standard MCP tools/call Format**: Use the standard MCP tools/call message format:
+
+   ```json
+   {
+     "jsonrpc": "2.0",
+     "method": "tools/call",
+     "params": {
+       "name": "toolName",
+       "arguments": {
+         "param1": "value1",
+         "param2": "value2"
+       }
+     },
+     "id": 1
+   }
+   ```
+
+   Note: The `arguments` field is used instead of `parameters`. This is required for compatibility with the standard MCP tools/call format and direct-intercept mode.
+
+3. **Use the Debug Tool**: The server includes a built-in debug tool to test tool invocation:
+
+   ```bash
+   curl -X POST \
+     -H "Content-Type: application/json" \
+     -H "mcp-session-id: YOUR_SESSION_ID" \
+     http://localhost:8080/message \
+     -d '{
+       "jsonrpc": "2.0",
+       "method": "tools/call",
+       "params": {
+         "name": "debug",
+         "arguments": {
+           "message": "Testing connection",
+           "testMode": true
+         }
+       },
+       "id": 1
+     }'
+   ```
+
+4. **Check Server Logs**: Look for detailed logs showing:
+
+   - SSE connection establishment
+   - Session ID creation and tracking
+   - JSON parsing of message bodies
+   - Tool call processing
+   - Direct interception of tools/call requests
+
+5. **Common Issues**:
+
+   - "Headers already sent" errors can occur if trying to modify response headers after sending data
+   - Missing session ID in message requests
+   - Incorrect JSON formatting in tool call requests
+   - CORS issues when connecting from a different origin
+   - "stream is not readable" errors when the request body is consumed before the SSE transport can process it
+   - Tool calls not being executed (looking for "EXECUTING TOOL" in logs)
+
+6. **Authentication Headers Handling**:
+
+   - The gateway seamlessly passes authentication headers (Authorization, tokens, etc.) through the entire request chain
+   - Authentication headers are automatically detected and preserved across all transport layers
+   - Handles various authentication header formats: Authorization, bspa_access_token, api-key, etc.
+   - When experiencing "登录信息超时" (login timeout) errors, check that:
+     - Your client is sending proper authentication headers
+     - The headers are being correctly passed through (see server logs)
+     - The format of authentication headers matches what the API expects
+   - You can test authentication header passing with a simple curl command:
+     ```bash
+     curl -X POST \
+       -H "Content-Type: application/json" \
+       -H "Authorization: Bearer YOUR_TOKEN" \
+       -H "mcp-session-id: YOUR_SESSION_ID" \
+       http://localhost:8000/message \
+       -d '{
+         "jsonrpc": "2.0",
+         "method": "tools/call",
+         "params": {
+           "name": "debug",
+           "arguments": {
+             "message": "Testing auth headers",
+             "testMode": true
+           }
+         },
+         "id": 1
+       }'
+     ```
+   - The authentication header will be passed to the SSE server and then to the API call
+
+7. **tools/call Direct Interception**:
+
+   - The apiToSse module uses direct interception for tools/call requests
+   - These requests are intercepted before passing to the SSE transport
+   - Direct interception logs will show: "===== 直接拦截并处理tools/call请求 ====="
+   - If you don't see this log, check that your request format follows the standard MCP tools/call format
+   - This approach bypasses any potential issues with the SSE transport's handling of tools/call requests
+
+8. **Request Body Handling**:
+
+   - The apiToSse module includes special handling for message path request bodies
+   - For message endpoint requests, the raw request body is preserved for processing
+   - Ensure that Content-Type header is set to "application/json" for message requests
+   - When testing with curl, verify the full request body syntax matches JSON-RPC format
+   - Use --logLevel debug flag when starting the server to see detailed request processing logs
+
+9. **Request Headers Pass-through**:
+   - Authentication headers (Authorization, bspa_access_token) from SSE connection are passed to API calls
+   - Session headers are preserved and tracked throughout the connection lifecycle
+   - To verify headers are passed correctly, check the RequestHeaders log entries
 
 ## Why MCP?
 
@@ -352,6 +505,9 @@ The Streamable HTTP transport is the latest MCP standard, offering improved perf
 - **Comprehensive CORS Support**: Configurable cross-origin resource sharing
 - **Enhanced Session Management**: Robust handling of session IDs with fallback mechanisms
 - **Detailed Logging**: Comprehensive logging for debugging and monitoring
+- **Robust Error Handling**: Prevents common issues like "Headers already sent" errors in SSE connections
+- **Tool Call Debugging**: Built-in debug tools to test and validate tool invocation chains
+- **Auto-Session Detection**: Automatically selects the correct session when only one is active
 
 ## Contributors
 
@@ -370,4 +526,13 @@ Issues and PRs welcome. Please open one if you encounter problems or have featur
 ## License
 
 [MIT License](./LICENSE)
+
+## Contact
+
+欢迎有兴趣的伙伴+v入群技术沟通：
+
+![微信二维码](mywxqrcode.jpg)
+
+```
+
 ```
