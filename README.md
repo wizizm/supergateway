@@ -531,7 +531,7 @@ Issues and PRs welcome. Please open one if you encounter problems or have featur
 
 欢迎有兴趣的伙伴+v入群技术沟通：
 
-![微信二维码](mywxqrcode.jpg)
+<img src="mywxqrcode.jpg" alt="微信二维码" width="200"/>
 
 ```
 
