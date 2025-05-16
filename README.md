@@ -1,3 +1,5 @@
+## This project has bean migrated to https://github.com/michlyn/mcpgateway
+
 ### Enhanced version of https://github.com/supercorp-ai/supergateway, adding streamablehttp support and the ability to run MCP services based on both OpenAPI protocol interface documentation and [higress MCP template files](https://github.com/higress-group/openapi-to-mcpserver).
 
 # SuperGateway
